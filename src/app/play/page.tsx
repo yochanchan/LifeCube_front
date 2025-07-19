@@ -126,7 +126,7 @@ export default function RideForm() {
       }));
 
     try {
-      const res = await fetch(process.env.NEXT_PUBLIC_API_ENDPOINT + "/api/play", {
+      const res = await fetch(process.env.NEXT_PUBLIC_API_ENDPOINT + "/openai/play", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -161,7 +161,7 @@ export default function RideForm() {
     const safeText = editableText.slice(0, 4096);
 
     try {
-      const res = await fetch(process.env.NEXT_PUBLIC_API_ENDPOINT + "/api/tts", {
+      const res = await fetch(process.env.NEXT_PUBLIC_API_ENDPOINT + "/openai/tts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ partial_narration: safeText }),
