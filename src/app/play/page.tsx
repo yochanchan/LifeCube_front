@@ -24,10 +24,6 @@ const seatJP: Record<Seat, string> = {
   REAR_RIGHT: "後部右",
 };
 
-/* API ベース URL（環境変数優先） */
-const API_BASE =
-  process.env.NEXT_PUBLIC_API_BASE?.replace(/\/$/, "") || "http://localhost:8000";
-
 export default function RideForm() {
   /* ---------------- 入力ステート ---------------- */
   const [scenario, setScenario] = useState("アナと雪の女王");
@@ -130,7 +126,7 @@ export default function RideForm() {
       }));
 
     try {
-      const res = await fetch(`${API_BASE}/api/play`, {
+      const res = await fetch(process.env.NEXT_PUBLIC_API_ENDPOINT + "/api/play", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -165,7 +161,7 @@ export default function RideForm() {
     const safeText = editableText.slice(0, 4096);
 
     try {
-      const res = await fetch(`${API_BASE}/api/tts`, {
+      const res = await fetch(process.env.NEXT_PUBLIC_API_ENDPOINT + "/api/tts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ partial_narration: safeText }),

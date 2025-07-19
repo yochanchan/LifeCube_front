@@ -13,7 +13,7 @@ export default function Home() {
   // FastAPIのエンドポイント設定
   const handleGetRequest = async () => {
     try {
-      const response = await fetch('http://localhost:8000/api/hello');
+      const response = await fetch(process.env.NEXT_PUBLIC_API_ENDPOINT + "/common/hello");
       const data = await response.json();
       setGetMessage(data.message);
     } catch (error) {
@@ -23,7 +23,7 @@ export default function Home() {
 
   const handleMultiplyRequest = async () => {
     try {
-      const response = await fetch(`http://localhost:8000/api/multiply/${multiplyNumber}`);
+      const response = await fetch(process.env.NEXT_PUBLIC_API_ENDPOINT + `/common/multiply/${multiplyNumber}`);
       const data = await response.json();
       setMultiplyResult(data.doubled_value.toString());
     } catch (error) {
@@ -33,7 +33,7 @@ export default function Home() {
 
   const handlePostRequest = async () => {
     try {
-      const response = await fetch('http://localhost:8000/api/echo', {
+      const response = await fetch(process.env.NEXT_PUBLIC_API_ENDPOINT + "/common/echo", {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
