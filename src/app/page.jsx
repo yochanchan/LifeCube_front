@@ -110,7 +110,7 @@ export default function Home() {
           )}
         </section>
 
-        {/* 後で何かするとき用 */}
+        {/* Playページへのリンク */}
         <section>
           <Link href={"/play"}>
             <button className="btn btn-neutral w-20 border-0 bg-red-200 text-black hover:text-white">
