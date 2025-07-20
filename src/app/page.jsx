@@ -1,6 +1,6 @@
 'use client';
 import { useState } from 'react';
-import Link from "next/link"; // Linkコンポーネントは既にインポートされています
+import Link from "next/link";
 
 export default function Home() {
   // useStateを使った値（状態）管理
@@ -118,21 +118,6 @@ export default function Home() {
             </button>
           </Link>
         </section>
-
-        {/*「はまさん」ページへのリンク*/}
-        <section>
-          <h2 className="text-xl font-bold mb-4">はまさんの開発機能は以下です！</h2>
-          <Link href="/test_hama"> {/* /test_hama へ遷移 */}
-            <button
-              className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded"
-              // Tailwind CSS のクラスを既存のボタンに合わせました。
-              // 必要であれば btn btn-neutral w-20 border-0 bg-red-200 text-black hover:text-white のようなクラスも適用可能です
-            >
-              はまさんページへ
-            </button>
-          </Link>
-        </section>
-        {/*ここまで追加（はまさん）*/}
       </div>
     </div>
   );
