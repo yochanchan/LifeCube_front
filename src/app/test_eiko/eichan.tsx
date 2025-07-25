@@ -14,4 +14,17 @@
 
 /* ---------------- UI（htmlっぽい部分） ---------------- */
 
+import React from 'react';  
 
+const EichanContent : React.FC = () => {
+  return (
+    <div>      
+      <p>このページは、完全にはまさんの真似をして沢田が追加したコンポーネントです。</p>
+      <ul>
+        <li>機能1</li>
+      </ul>
+    </div>
+  );
+};
+
+export default EichanContent;
