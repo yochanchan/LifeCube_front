@@ -2,64 +2,54 @@
 
 import { useEffect, useRef, useState } from "react";
 
-// ---- 型定義 ------------------------------------------------------
+/* ---------- 型定義 ---------- */
 type Msg = { id?: string; type: string; from: string; text?: string };
 type WsStatus = "connecting" | "open" | "closed" | "error";
 
-// ---- Main --------------------------------------------------------
+/* ---------- Main ---------- */
 export default function Home() {
-  /** 端末識別子 */
+  /* 端末識別子 */
   const cid = useRef(`client-${Math.random().toString(36).slice(-4)}`);
 
-  /** 接続 URL を構築（環境変数が無ければ現在ロケーションから生成） */
-  const wsURL =
-    process.env.NEXT_PUBLIC_WS_URL ??
-    `${typeof window !== "undefined" && window.location.protocol === "https:" ? "wss" : "ws"}://${typeof window !==
-      "undefined"
-      ? window.location.host
-      : ""}/ws_test/ws/${cid.current}`;
+  /* 接続 URL（.env にドメインを入れる前提でシンプル化） */
+  const base =
+    (process.env.NEXT_PUBLIC_WS_URL ??
+      `ws://${typeof window !== "undefined" ? window.location.host : ""}` // fallback: 開発用
+    ).replace(/\/+$/, ""); // 末尾スラッシュを1本も残さない
 
-  /** React state */
+  const wsURL = `${base}/ws_test/ws/${cid.current}`;
+
+  /* React state */
   const [ws, setWs] = useState<WebSocket>();
   const [status, setStatus] = useState<WsStatus>("connecting");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [log, setLog] = useState<Msg[]>([]);
   const [inp, setInp] = useState("");
 
-  // ---- WebSocket を 1度だけ張る（StrictMode 二重実行防止） ----
+  /* WebSocket を 1度だけ張る */
   useEffect(() => {
-    if (ws) return; // 既に張っている場合スキップ
-
+    if (ws) return;
     console.log("⏳ connecting to", wsURL);
+
     const socket = new WebSocket(wsURL);
 
-    /** open */
     socket.onopen = () => {
       console.log("✅ socket open");
       setStatus("open");
       setErrorMsg(null);
     };
-
-    /** close */
     socket.onclose = (e) => {
       console.log("🔌 socket closed", e.reason);
       setStatus("closed");
     };
-
-    /** error */
     socket.onerror = (e) => {
       console.error("❌ socket error", e);
       setStatus("error");
       setErrorMsg("WebSocket error (see console for details)");
     };
-
-    /** message */
     socket.onmessage = (e) => {
       const raw: Msg = JSON.parse(e.data);
-
-      // id 無しパケットにはクライアント側で付与
       const m: Msg = raw.id ? raw : { ...raw, id: crypto.randomUUID() };
-
       setLog((prev) =>
         m.type === "delete" ? prev.filter((x) => x.id !== m.id) : [...prev, m],
       );
@@ -68,7 +58,7 @@ export default function Home() {
     setWs(socket);
   }, [ws, wsURL]);
 
-  // ---- 送信ユーティリティ ----------------------------------------
+  /* 送信ユーティリティ */
   const send = (type: Msg["type"], extra: Record<string, unknown> = {}) => {
     if (ws?.readyState === WebSocket.OPEN) {
       ws.send(JSON.stringify({ from: cid.current, type, ...extra }));
@@ -78,7 +68,7 @@ export default function Home() {
     }
   };
 
-  // ---- UI ---------------------------------------------------------
+  /* ステータス色 */
   const statusColor: Record<WsStatus, string> = {
     connecting: "orange",
     open: "green",
@@ -86,6 +76,7 @@ export default function Home() {
     error: "red",
   };
 
+  /* ---------- UI ---------- */
   return (
     <main
       style={{
@@ -94,7 +85,7 @@ export default function Home() {
         margin: "2rem auto",
       }}
     >
-      {/* 接続ステータス表示 */}
+      {/* 接続ステータス */}
       <div
         style={{
           padding: "6px 12px",
@@ -108,14 +99,14 @@ export default function Home() {
         {errorMsg && ` — ${errorMsg}`}
       </div>
 
-      {/* URL・クライアント ID */}
+      {/* URL とクライアント ID */}
       <p style={{ fontSize: 12, wordBreak: "break-all", marginTop: 0 }}>
-        WS&nbsp;URL:&nbsp;{wsURL}
+        WS URL:&nbsp;{wsURL}
         <br />
-        Your&nbsp;id:&nbsp;{cid.current}
+        Your id:&nbsp;{cid.current}
       </p>
 
-      {/* アクション */}
+      {/* ボタン & フォーム */}
       <button onClick={() => send("poke")}>Poke 👆</button>
 
       <form
