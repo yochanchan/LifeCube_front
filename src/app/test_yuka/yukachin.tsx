@@ -46,7 +46,8 @@ export default function Home() {
           <h2 className="text-xl font-bold mb-4" style={{color:"#fff"}}>視聴しているプログラム名および役名を入力してください。</h2>
           <div className="flex gap-2">
           <input
-              type="text" size="50"
+              type="text"
+              size={50}
               value={actorName}
               onChange={(e) => setActorName(e.target.value)} 
               className="border rounded px-2 py-1"
