@@ -145,3 +145,9 @@ export default function Home() {
             >
               ❌
             </button>
+          </li>
+        ))}
+      </ul>
+    </main>
+  );
+}
