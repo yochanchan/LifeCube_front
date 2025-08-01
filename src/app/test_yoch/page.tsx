@@ -12,7 +12,7 @@ export default function Home() {
   const cid = useRef(`client-${Math.random().toString(36).slice(-4)}`);
 
   /* 接続 URL */
-  const base = process.env.NEXT_PUBLIC_WS_URL
+  const base = process.env.NEXT_PUBLIC_WS_URL;
 
   const wsURL = `${base}/ws_test/ws/${cid.current}`;
 
@@ -47,9 +47,16 @@ export default function Home() {
     socket.onmessage = (e) => {
       const raw: Msg = JSON.parse(e.data);
       const m: Msg = raw.id ? raw : { ...raw, id: crypto.randomUUID() };
-      setLog((prev) =>
-        m.type === "delete" ? prev.filter((x) => x.id !== m.id) : [...prev, m],
-      );
+
+      setLog(prev => {
+        if (m.type === "delete") {
+          return prev.filter(x => x.id !== m.id);        // 削除要求
+        }
+        if (m.id && prev.some(x => x.id === m.id)) {
+          return prev;                                   // 既にある → 追加しない
+        }
+        return [...prev, m];                             // 新規メッセージ
+      });
     };
 
     setWs(socket);
