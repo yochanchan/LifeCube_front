@@ -8,7 +8,7 @@ export function useCamera(
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [stream, setStream] = useState<MediaStream | null>(null);
 
-  /** ① ストリーム取得は一度だけ */
+  /** ストリーム取得は一度だけにする。開発用ではuseEffectが2回走ってしまうことへの対処 */
   useEffect(() => {
     let canceled = false;
     (async () => {
@@ -35,7 +35,18 @@ export function useCamera(
     if (!stream || !videoRef.current) return;
     const v = videoRef.current;
     v.srcObject = stream;
-    v.play().catch(err => console.error('video.play() error', err));
+
+    const handleLoaded = () => {
+      const c = canvasRef.current;
+      if (!c) return;
+      c.width = v.videoWidth;
+      c.height = v.videoHeight;
+    };
+    v.addEventListener('loadedmetadata', handleLoaded);
+
+    v.play().catch(console.error);
+
+    return () => v.removeEventListener('loadedmetadata', handleLoaded);
   }, [stream]);
 
   /** ③ スナップショット */
