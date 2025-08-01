@@ -11,11 +11,8 @@ export default function Home() {
   /* 端末識別子 */
   const cid = useRef(`client-${Math.random().toString(36).slice(-4)}`);
 
-  /* 接続 URL（.env にドメインを入れる前提でシンプル化） */
-  const base =
-    (process.env.NEXT_PUBLIC_WS_URL ??
-      `ws://${typeof window !== "undefined" ? window.location.host : ""}` // fallback: 開発用
-    ).replace(/\/+$/, ""); // 末尾スラッシュを1本も残さない
+  /* 接続 URL */
+  const base = process.env.NEXT_PUBLIC_WS_URL
 
   const wsURL = `${base}/ws_test/ws/${cid.current}`;
 
