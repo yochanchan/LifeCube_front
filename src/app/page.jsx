@@ -151,14 +151,14 @@ export default function Home() {
 
         {/*「ゆかちん」ページへのリンク*/}
         <section>
-          <h2 className="text-xl font-bold mb-4">ゆかちんのNetflix Role Searchへようこそ</h2>
+          <h2 className="text-xl font-bold mb-4">ゆかちんページ</h2>
           <Link href="/test_yuka"> {/* /test_yuka へ遷移 */}
             <button
               className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded"
             // Tailwind CSS のクラスを既存のボタンに合わせました。
             // 必要であれば btn btn-neutral w-20 border-0 bg-red-200 text-black hover:text-white のようなクラスも適用可能です
             >
-              Netflix Role Search
+              トリガー判定機能
             </button>
           </Link>
         </section>
