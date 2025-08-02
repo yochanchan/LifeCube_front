@@ -125,13 +125,13 @@ export default function Home() {
           <Link href="/test_hama"> {/* /test_hama へ遷移 */}
             <button
               className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded"
-              // Tailwind CSS のクラスを既存のボタンに合わせました。
-              // 必要であれば btn btn-neutral w-20 border-0 bg-red-200 text-black hover:text-white のようなクラスも適用可能です
+            // Tailwind CSS のクラスを既存のボタンに合わせました。
+            // 必要であれば btn btn-neutral w-20 border-0 bg-red-200 text-black hover:text-white のようなクラスも適用可能です
             >
               はまさんページへ
             </button>
           </Link>
-          </section>
+        </section>
         {/*ここまで追加（はまさん）*/}
 
         {/*「えいちゃん」ページへのリンク*/}
@@ -140,29 +140,51 @@ export default function Home() {
           <Link href="/test_eiko"> {/* /test_eiko へ遷移 */}
             <button
               className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded"
-              // Tailwind CSS のクラスを既存のボタンに合わせました。
-              // 必要であれば btn btn-neutral w-20 border-0 bg-red-200 text-black hover:text-white のようなクラスも適用可能です
+            // Tailwind CSS のクラスを既存のボタンに合わせました。
+            // 必要であれば btn btn-neutral w-20 border-0 bg-red-200 text-black hover:text-white のようなクラスも適用可能です
             >
               えいちゃんページへ
             </button>
           </Link>
         </section>
         {/*ここまで追加（えいちゃん）*/}
-        
+
         {/*「ゆかちん」ページへのリンク*/}
         <section>
           <h2 className="text-xl font-bold mb-4">ゆかちんページ</h2>
           <Link href="/test_yuka"> {/* /test_yuka へ遷移 */}
             <button
               className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded"
-              // Tailwind CSS のクラスを既存のボタンに合わせました。
-              // 必要であれば btn btn-neutral w-20 border-0 bg-red-200 text-black hover:text-white のようなクラスも適用可能です
+            // Tailwind CSS のクラスを既存のボタンに合わせました。
+            // 必要であれば btn btn-neutral w-20 border-0 bg-red-200 text-black hover:text-white のようなクラスも適用可能です
             >
               トリガー判定機能
             </button>
           </Link>
         </section>
         {/*ここまで追加（ゆかちん）*/}
+
+        {/*「ようちゃん」ページへのリンク*/}
+        <section>
+          <h2 className="text-xl font-bold mb-4">ようちゃんページ</h2>
+          <Link href="/test_yoch">
+            <button
+              className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded"
+            // Tailwind CSS のクラスを既存のボタンに合わせました。
+            // 必要であれば btn btn-neutral w-20 border-0 bg-red-200 text-black hover:text-white のようなクラスも適用可能です
+            >
+              yochan_WebSocket
+            </button>
+          </Link>
+          <Link href="/test_camera">
+            <button
+              className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded"
+            >
+              yochan_camera
+            </button>
+          </Link>
+        </section>
+        {/*ここまで追加（ようちゃん）*/}
       </div>
     </div>
   );
