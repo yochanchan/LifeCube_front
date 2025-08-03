@@ -176,7 +176,7 @@ export default function Home() {
               yochan_WebSocket
             </button>
           </Link>
-          <Link href="/test_camera">
+          <Link href="/yochan_camera">
             <button
               className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded"
             >
