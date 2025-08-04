@@ -25,7 +25,7 @@ export function useYochanCamera(
       };
 
       const newConstraints: MediaStreamConstraints = {
-        ...constraints,
+        ...(constraints || {}),
         video: videoConstraints
       };
 
