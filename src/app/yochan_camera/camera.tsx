@@ -19,13 +19,13 @@ export function useYochanCamera(
     }
 
     try {
-      const videoConstraints = {
-        ...constraints.video,
+      const videoConstraints: MediaTrackConstraints = {
+        ...(constraints.video as MediaTrackConstraints || {}),
         deviceId: newDeviceId ? { exact: newDeviceId } : undefined
       };
 
-      const newConstraints = {
-        ...constraints,
+      const newConstraints: MediaStreamConstraints = {
+        ...(constraints || {}),
         video: videoConstraints
       };
 
