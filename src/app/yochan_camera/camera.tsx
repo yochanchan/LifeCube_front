@@ -24,7 +24,7 @@ export function useYochanCamera(
         deviceId: newDeviceId ? { exact: newDeviceId } : undefined
       };
 
-      const newConstraints = {
+      const newConstraints: MediaStreamConstraints = {
         ...constraints,
         video: videoConstraints
       };
