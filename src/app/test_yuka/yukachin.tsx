@@ -12,8 +12,14 @@ export default function App() {
   const inputMessage = "シャッター";
   const triggerWord = "シャッター";
 
+    /* 接続 URL */
+  const cid = useRef("yuka"); // 固定でもOK、ランダムでもOK
+  const base = process.env.NEXT_PUBLIC_WS_FRONT ?? "ws://localhost:3001";
+  const wsFRONT = `${base}/ws_test/ws/${cid.current}`;
+  
   useEffect(()=>{
-   socketRef.current = new WebSocket("ws://localhost:3001/ws_test/ws/yuka");
+   console.log("WebSocket接続開始:", wsFRONT); // 確認用ログ
+  socketRef.current = new WebSocket(wsFRONT);
    
   socketRef.current.onopen = () => {
     console.log("WebSocket接続成功");
