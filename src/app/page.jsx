@@ -121,18 +121,15 @@ export default function Home() {
 
         {/*「はまさん」ページへのリンク*/}
         <section>
-          <h2 className="text-xl font-bold mb-4">はまさんの開発機能は以下です！</h2>
+          <h2 className="text-xl font-bold mb-4">はまさんの宿題ページは以下です（音声認識は下の方に追加）</h2>
           <Link href="/test_hama"> {/* /test_hama へ遷移 */}
             <button
               className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded"
-            // Tailwind CSS のクラスを既存のボタンに合わせました。
-            // 必要であれば btn btn-neutral w-20 border-0 bg-red-200 text-black hover:text-white のようなクラスも適用可能です
             >
               はまさんページへ
             </button>
           </Link>
         </section>
-        {/*ここまで追加（はまさん）*/}
 
         {/*「えいちゃん」ページへのリンク*/}
         <section>
@@ -140,14 +137,11 @@ export default function Home() {
           <Link href="/test_eiko"> {/* /test_eiko へ遷移 */}
             <button
               className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded"
-            // Tailwind CSS のクラスを既存のボタンに合わせました。
-            // 必要であれば btn btn-neutral w-20 border-0 bg-red-200 text-black hover:text-white のようなクラスも適用可能です
             >
               えいちゃんページへ
             </button>
           </Link>
         </section>
-        {/*ここまで追加（えいちゃん）*/}
 
         {/*「ゆかちん」ページへのリンク*/}
         <section>
@@ -155,14 +149,11 @@ export default function Home() {
           <Link href="/test_yuka"> {/* /test_yuka へ遷移 */}
             <button
               className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded"
-            // Tailwind CSS のクラスを既存のボタンに合わせました。
-            // 必要であれば btn btn-neutral w-20 border-0 bg-red-200 text-black hover:text-white のようなクラスも適用可能です
             >
               トリガー判定機能
             </button>
           </Link>
         </section>
-        {/*ここまで追加（ゆかちん）*/}
 
         {/*「ようちゃん」ページへのリンク*/}
         <section>
@@ -170,8 +161,6 @@ export default function Home() {
           <Link href="/test_yoch">
             <button
               className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded"
-            // Tailwind CSS のクラスを既存のボタンに合わせました。
-            // 必要であれば btn btn-neutral w-20 border-0 bg-red-200 text-black hover:text-white のようなクラスも適用可能です
             >
               yochan_WebSocket
             </button>
@@ -191,7 +180,22 @@ export default function Home() {
             </button>
           </Link>
         </section>
-        {/*ここまで追加（ようちゃん）*/}
+        
+        {/* ▼▼▼▼▼ ここからが追加部分 ▼▼▼▼▼ */}
+        {/*「音声認識」ページへのリンク*/}
+        <section>
+          <h2 className="text-xl font-bold mb-4">リアルタイム音声認識機能</h2>
+          <Link href="/test_speech"> {/* /test_speech へ遷移 */}
+            <button
+              className="bg-purple-500 hover:bg-purple-600 text-white px-4 py-2 rounded"
+            // 他のボタンと区別しやすいように、紫色(purple)にしてみました。
+            >
+              音声認識ページへ
+            </button>
+          </Link>
+        </section>
+        {/* ▲▲▲▲▲ ここまでが追加部分 ▲▲▲▲▲ */}
+
       </div>
     </div>
   );
