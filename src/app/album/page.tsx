@@ -9,6 +9,16 @@ const API_BASE_RAW = process.env.NEXT_PUBLIC_API_ENDPOINT;
 // Normalize: empty string if undefined, and strip trailing slashes to avoid double //
 const API_BASE = (API_BASE_RAW ?? "").replace(/\/+$/, "");
 
+// For PoC: account_id を localStorage or .env から取得（未設定 = 全件）
+function getAccountId(): string | null {
+  if (typeof window !== "undefined") {
+    const fromLS = window.localStorage.getItem("account_id");
+    if (fromLS) return fromLS;
+  }
+  const fromEnv = process.env.NEXT_PUBLIC_ACCOUNT_ID;
+  return fromEnv ?? null;
+}
+
 // --- Types ---
 export type PictureMeta = {
   picture_id: number;
@@ -45,20 +55,29 @@ async function fetchJSON<T>(url: string): Promise<T> {
   return res.json();
 }
 
-// Endpoints (adjust to your FastAPI routes)
+// Endpoints (FastAPI routes) — account_id は任意
 const endpoints = {
-  dates: (tripId?: string | null) =>
-    `${API_BASE}/pictures/dates${tripId ? `?trip_id=${encodeURIComponent(tripId)}` : ""}`,
-  byDate: (date: string, tripId?: string | null, thumbW = 256) =>
-    `${API_BASE}/pictures/by-date?date=${encodeURIComponent(date)}${tripId ? `&trip_id=${encodeURIComponent(tripId)}` : ""
-    }&thumb_w=${thumbW}`,
-  image: (id: number) => `${API_BASE}/pictures/${id}/image`,
-  thumb: (id: number, w = 256) => `${API_BASE}/pictures/${id}/thumbnail?w=${w}`,
+  dates: (accountId?: string | null, tripId?: string | null) => {
+    const params = new URLSearchParams();
+    if (accountId) params.set("account_id", accountId);
+    if (tripId) params.set("trip_id", tripId);
+    const q = params.toString();
+    return `${API_BASE}/api/pictures/dates${q ? `?${q}` : ""}`;
+  },
+  byDate: (date: string, accountId?: string | null, tripId?: string | null, thumbW = 256) => {
+    const params = new URLSearchParams({ date, thumb_w: String(thumbW) });
+    if (accountId) params.set("account_id", accountId);
+    if (tripId) params.set("trip_id", tripId);
+    return `${API_BASE}/api/pictures/by-date?${params.toString()}`;
+  },
+  image: (id: number) => `${API_BASE}/api/pictures/${id}/image`,
+  thumb: (id: number, w = 256) => `${API_BASE}/api/pictures/${id}/thumbnail?w=${w}`,
 };
 
 export default function AlbumPage() {
   const sp = useSearchParams();
   const tripId = sp.get("trip_id"); // optional
+  const [accountId, setAccountId] = useState<string | null>(null);
 
   const [dates, setDates] = useState<string[]>([]);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
@@ -69,14 +88,19 @@ export default function AlbumPage() {
   const [loadingPics, setLoadingPics] = useState(false);
   const [errorPics, setErrorPics] = useState<string | null>(null);
 
-  // Load available dates (JST-based) on mount or when tripId changes
+  // resolve account_id on mount（未設定でもOK = 全件）
+  useEffect(() => {
+    setAccountId(getAccountId());
+  }, []);
+
+  // Load available dates (JST-based) when accountId or tripId changes
   useEffect(() => {
     let mounted = true;
     (async () => {
       setLoadingDates(true);
       setErrorDates(null);
       try {
-        const list = await fetchJSON<string[]>(endpoints.dates(tripId));
+        const list = await fetchJSON<string[]>(endpoints.dates(accountId, tripId));
         if (!mounted) return;
         setDates(list);
         // Default select the latest date if available
@@ -91,7 +115,7 @@ export default function AlbumPage() {
     return () => {
       mounted = false;
     };
-  }, [tripId]);
+  }, [accountId, tripId]);
 
   // Load pictures for selected date
   useEffect(() => {
@@ -101,7 +125,9 @@ export default function AlbumPage() {
       setLoadingPics(true);
       setErrorPics(null);
       try {
-        const metas = await fetchJSON<PictureMeta[]>(endpoints.byDate(selectedDate, tripId, 256));
+        const metas = await fetchJSON<PictureMeta[]>(
+          endpoints.byDate(selectedDate, accountId, tripId, 256)
+        );
         if (!mounted) return;
         setPictures(metas);
       } catch (e: any) {
@@ -114,7 +140,7 @@ export default function AlbumPage() {
     return () => {
       mounted = false;
     };
-  }, [selectedDate, tripId]);
+  }, [selectedDate, accountId, tripId]);
 
   return (
     <main className="min-h-screen bg-gradient-to-b from-rose-50 via-pink-50 to-purple-50">
@@ -178,13 +204,13 @@ function DateChips({
     );
   }
   if (error) {
-    return (
-      <div className="mt-3 rounded-xl bg-rose-100 p-3 text-rose-800">エラー: {error}</div>
-    );
+    return <div className="mt-3 rounded-xl bg-rose-100 p-3 text-rose-800">エラー: {error}</div>;
   }
   if (dates.length === 0) {
     return (
-      <div className="mt-3 rounded-xl bg-white p-3 text-rose-700 ring-1 ring-rose-100">まだ写真がありません。</div>
+      <div className="mt-3 rounded-xl bg-white p-3 text-rose-700 ring-1 ring-rose-100">
+        まだ写真がありません。
+      </div>
     );
   }
   return (
@@ -231,13 +257,13 @@ function PicturesGrid({
     );
   }
   if (error) {
-    return (
-      <div className="mt-3 rounded-xl bg-rose-100 p-3 text-rose-800">エラー: {error}</div>
-    );
+    return <div className="mt-3 rounded-xl bg-rose-100 p-3 text-rose-800">エラー: {error}</div>;
   }
   if (items.length === 0) {
     return (
-      <div className="mt-3 rounded-xl bg-white p-6 text-center text-rose-700 ring-1 ring-rose-100">この日には写真がありません。</div>
+      <div className="mt-3 rounded-xl bg-white p-6 text-center text-rose-700 ring-1 ring-rose-100">
+        この日には写真がありません。
+      </div>
     );
   }
 
@@ -253,12 +279,7 @@ function PicturesGrid({
             key={p.picture_id}
             className="group relative overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-rose-100"
           >
-            <a
-              href={endpoints.image(p.picture_id)}
-              target="_blank"
-              rel="noreferrer noopener"
-              className="block"
-            >
+            <a href={endpoints.image(p.picture_id)} target="_blank" rel="noreferrer noopener" className="block">
               {/* Prefer backend-provided thumbnail path when available */}
               <img
                 src={thumbSrc}
@@ -272,9 +293,7 @@ function PicturesGrid({
               <span className="truncate" title={p.pictured_at}>
                 {p.pictured_at.slice(11, 16)} {/* HH:mm */}
               </span>
-              {p.device_id && (
-                <span className="rounded bg-rose-50 px-2 py-0.5 text-rose-600">{p.device_id}</span>
-              )}
+              {p.device_id && <span className="rounded bg-rose-50 px-2 py-0.5 text-rose-600">{p.device_id}</span>}
             </figcaption>
           </figure>
         );
