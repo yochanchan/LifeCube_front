@@ -1,7 +1,8 @@
 // app/album/page.tsx  (Server Component)
 import { Suspense } from "react";
-import AlbumClient from "./AlbumClient"; // ← クライアント子
+import AlbumClient from "./AlbumClient"; // クライアント側の描画コンポーネント
 
+// API ベースURL（SSRでも環境変数から解決）
 const API_BASE = (process.env.NEXT_PUBLIC_API_ENDPOINT ?? "").replace(/\/+$/, "");
 
 export default async function Page({
@@ -9,18 +10,25 @@ export default async function Page({
 }: {
   searchParams?: { [k: string]: string | string[] | undefined };
 }) {
+  // URL の ?trip_id=... を SSR で解決（なければ null）
   const tripId = typeof searchParams?.trip_id === "string" ? searchParams!.trip_id : null;
 
-  // サーバーで取れるなら事前取得（cookieでも可）
+  // SSR時に分かる account_id（PoCでは環境変数で擬似的に）
   const accountId = process.env.NEXT_PUBLIC_ACCOUNT_ID ?? null;
 
+  // クライアントに渡す初期データの箱
   let initial = {
     accountId,
     dates: undefined as string[] | undefined,
     selectedDate: null as string | null,
-    pictures: undefined as any[] | undefined,
+    pictures: undefined as any[] | undefined, // ← 型はクライアント側で PictureMeta に合流
   };
 
+  /**
+   * ===== 可能なら SSR で先読み =====
+   * - アルバム日付 → その最新日付の一覧、の順でフェッチ
+   * - 失敗したら無視（クライアントのSWRが改めて取りに行く）
+   */
   if (accountId) {
     const q = new URLSearchParams({ account_id: accountId });
     if (tripId) q.set("trip_id", tripId);
@@ -45,6 +53,7 @@ export default async function Page({
 
   return (
     <Suspense fallback={<div className="p-4">読み込み中…</div>}>
+      {/* クライアントへバトン。SWRの fallbackData に初期値として渡される */}
       <AlbumClient tripId={tripId} initial={initial} />
     </Suspense>
   );
