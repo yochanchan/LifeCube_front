@@ -1,4 +1,4 @@
-// src/app/speech_shatter/component.tsx (環境変数対応・最終版)
+// src/app/speech_shatter/component.tsx (チームルール適合・最終完成版)
 
 "use client";
 
@@ -19,19 +19,17 @@ const SpeechShatterComponent = () => {
   useEffect(() => {
     setStatusMessage('WebSocketサーバーに接続しています...');
 
-    // 環境変数からベースURLを取得
-    const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
-    if (!apiBaseUrl) {
-      setStatusMessage("エラー: APIの接続先URLが設定されていません。");
-      console.error("環境変数 NEXT_PUBLIC_API_BASE_URL が設定されていません。");
+    // ▼▼▼【変更点1】チームの環境変数名に合わせて修正し、WS用も追加 ▼▼▼
+    const wsUrl = process.env.NEXT_PUBLIC_WS_URL;
+    if (!wsUrl) {
+      setStatusMessage("エラー: WebSocketの接続先URLが設定されていません。");
+      console.error("環境変数 NEXT_PUBLIC_WS_URL が設定されていません。");
       return;
     }
-
-    // WebSocketのURLを動的に生成
-    // httpをwsに、httpsをwssに置換することで、ローカルでも本番でも対応
-    const wsUrl = apiBaseUrl.replace(/^http/, 'ws') + "/ws_test/ws/yuka";
-    console.log("接続先のWebSocket URL:", wsUrl); // デバッグ用にURLを確認
     
+    console.log("接続先のWebSocket URL:", wsUrl);
+    
+    // ▼▼▼【変更点2】URLの動的生成ロジックを削除し、環境変数を直接使用 ▼▼▼
     socketRef.current = new WebSocket(wsUrl);
 
     socketRef.current.onopen = () => {
@@ -60,7 +58,7 @@ const SpeechShatterComponent = () => {
       }
       stopAutoRecording();
     };
-  }, []); // useEffectの依存配列は空のまま
+  }, []);
 
   const sendBlobToServer = (blob: Blob) => {
     if (blob.size === 0) return;
@@ -68,9 +66,9 @@ const SpeechShatterComponent = () => {
     const formData = new FormData();
     formData.append('audio_file', blob, 'recording.webm');
 
-    // fetchのURLも動的に生成
-    const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
-    const fetchUrl = `${apiBaseUrl}/transcribe_audio`;
+    // ▼▼▼【変更点3】HTTP APIのURLもチームの環境変数名に合わせて修正 ▼▼▼
+    const apiEndpoint = process.env.NEXT_PUBLIC_API_ENDPOINT;
+    const fetchUrl = `${apiEndpoint}/transcribe_audio`;
 
     fetch(fetchUrl, {
       method: 'POST',
@@ -108,6 +106,7 @@ const SpeechShatterComponent = () => {
     });
   };
 
+  // ... (以降の processAndRestart, startAutoRecording, stopAutoRecording, return文は変更ありません)
   const processAndRestart = () => {
     if (!recorder.current) return;
 
