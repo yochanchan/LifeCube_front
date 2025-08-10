@@ -1,4 +1,4 @@
-// src/app/speech_shatter/component.tsx (最終改善版)
+// src/app/speech_shatter/component.tsx (チームルール適合・最終完成版)
 
 "use client";
 
@@ -14,25 +14,32 @@ const SpeechShatterComponent = () => {
   const streamRef = useRef<MediaStream | null>(null);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const socketRef = useRef<WebSocket | null>(null);
-  // ▼▼▼【変更点1】初回接続試行のフラグをuseRefで管理 ▼▼▼
   const isInitialAttempt = useRef(true);
 
   useEffect(() => {
     setStatusMessage('WebSocketサーバーに接続しています...');
 
-    socketRef.current = new WebSocket("ws://localhost:8000/ws_test/ws/yuka");
+    // ▼▼▼【変更点1】チームの環境変数名に合わせて修正し、WS用も追加 ▼▼▼
+    const wsUrl = process.env.NEXT_PUBLIC_WS_URL;
+    if (!wsUrl) {
+      setStatusMessage("エラー: WebSocketの接続先URLが設定されていません。");
+      console.error("環境変数 NEXT_PUBLIC_WS_URL が設定されていません。");
+      return;
+    }
+    
+    console.log("接続先のWebSocket URL:", wsUrl);
+    
+    // ▼▼▼【変更点2】URLの動的生成ロジックを削除し、環境変数を直接使用 ▼▼▼
+    socketRef.current = new WebSocket(wsUrl);
 
     socketRef.current.onopen = () => {
       console.log("WebSocket接続に成功しました。");
       setStatusMessage('認識待機中（下のボタンで開始）');
-      // ▼▼▼【変更点2】接続が成功したら、初回試行フラグをfalseにする ▼▼▼
       isInitialAttempt.current = false;
     };
 
     socketRef.current.onerror = (error) => {
-      // ▼▼▼【変更点3】初回接続試行中(isInitialAttempt.currentがtrue)はコンソールにエラーを出力しない ▼▼▼
       if (!isInitialAttempt.current) {
-        // 2回目以降の「本物の」エラーだけをコンソールに出力する
         console.error("WebSocket接続エラー:", error);
       }
       setStatusMessage('エラー: WebSocketサーバーに接続できません。');
@@ -40,7 +47,6 @@ const SpeechShatterComponent = () => {
 
     socketRef.current.onclose = () => {
       console.warn("WebSocket接続が終了しました。");
-      // ▼▼▼【変更点4】本物のエラーの場合のみUIに反映させるように条件を少し変更 ▼▼▼
       if (!isInitialAttempt.current && isRecording) {
           setStatusMessage('エラー: WebSocket接続が切れました。');
       }
@@ -54,14 +60,17 @@ const SpeechShatterComponent = () => {
     };
   }, []);
 
-  // ... (以降の sendBlobToServer, startAutoRecordingなどの関数は変更なし)
   const sendBlobToServer = (blob: Blob) => {
     if (blob.size === 0) return;
     
     const formData = new FormData();
     formData.append('audio_file', blob, 'recording.webm');
 
-    fetch('http://localhost:8000/transcribe_audio', {
+    // ▼▼▼【変更点3】HTTP APIのURLもチームの環境変数名に合わせて修正 ▼▼▼
+    const apiEndpoint = process.env.NEXT_PUBLIC_API_ENDPOINT;
+    const fetchUrl = `${apiEndpoint}/transcribe_audio`;
+
+    fetch(fetchUrl, {
       method: 'POST',
       body: formData,
     })
@@ -97,6 +106,7 @@ const SpeechShatterComponent = () => {
     });
   };
 
+  // ... (以降の processAndRestart, startAutoRecording, stopAutoRecording, return文は変更ありません)
   const processAndRestart = () => {
     if (!recorder.current) return;
 
@@ -134,7 +144,6 @@ const SpeechShatterComponent = () => {
   const stopAutoRecording = () => {
     if (!isRecording || !recorder.current) return;
     
-    // 接続が確立している場合のみ待機メッセージに戻す
     if(socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
       setStatusMessage('認識待機中（下のボタンで開始）');
     }
