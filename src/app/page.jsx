@@ -189,15 +189,15 @@ export default function Home() {
         </section>
 
         {/* ▼▼▼▼▼ ここからが追加部分 ▼▼▼▼▼ */}
-        {/*「音声認識」ページへのリンク*/}
+        {/*「音声認識-シャッター判定」ページへのリンク*/}
         <section>
-          <h2 className="text-xl font-bold mb-4">リアルタイム音声認識機能</h2>
-          <Link href="/test_speech"> {/* /test_speech へ遷移 */}
+          <h2 className="text-xl font-bold mb-4">リアルタイム音声認識機能～シャッター判定</h2>
+          <Link href="/speech_shatter"> {/* /speech_shatter へ遷移 */}
             <button
               className="bg-purple-500 hover:bg-purple-600 text-white px-4 py-2 rounded"
             // 他のボタンと区別しやすいように、紫色(purple)にしてみました。
             >
-              音声認識ページへ
+              音声認識～シャッター判定のページへ
             </button>
           </Link>
         </section>
