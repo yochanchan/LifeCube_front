@@ -42,7 +42,7 @@ function formatJP(dateStr: string): string {
 
 /** SWR 用フェッチャ（毎回取得: no-store） */
 const fetcher = <T,>(url: string) =>
-  fetch(url, { cache: "no-store" }).then((res) => {
+  fetch(url, { cache: "no-store", credentials: "include" }).then((res) => {
     if (!res.ok) throw new Error(`Request failed: ${res.status} ${res.statusText}`);
     return res.json() as Promise<T>;
   });
