@@ -3,6 +3,7 @@
 
 import React, { useEffect, useState } from "react";
 import useSWR, { useSWRConfig } from "swr";
+import Link from "next/link";
 
 /* ───────────────────────────────────────────────────────────
    定数・ユーティリティ
@@ -199,6 +200,13 @@ function HeaderCute() {
         <h1 className="text-2xl font-extrabold tracking-tight text-rose-800">アルバム</h1>
         <p className="text-sm text-rose-500">JST基準で日付ごとの写真を表示します</p>
       </div>
+      <Link
+        href="/"
+        className="ml-auto inline-flex items-center gap-2 rounded-full bg-rose-500 px-4 py-2 text-white hover:bg-rose-600 focus:outline-none focus:ring-2 focus:ring-rose-300"
+        aria-label="トップページへ"
+      >
+        <span>トップへ</span>
+      </Link>
     </header>
   );
 }
@@ -277,7 +285,10 @@ function PicturesGrid({
 
     setDeletingId(id);
     try {
-      const res = await fetch(endpoints.deletePicture(id), { method: "DELETE" });
+      const res = await fetch(endpoints.deletePicture(id), {
+        method: "DELETE",
+        credentials: "include",
+      });
       if (!res.ok && res.status !== 204) {
         const text = await res.text().catch(() => "");
         throw new Error(`削除に失敗しました: ${res.status} ${res.statusText} ${text}`);
