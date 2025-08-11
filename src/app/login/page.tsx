@@ -1,7 +1,7 @@
 // app/auth/page.tsx
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 
 /** APIベースURL（末尾の / を除去） */
@@ -27,22 +27,6 @@ export default function AuthPage() {
   // 進行状態とエラー
   const [loading, setLoading] = useState<"login" | "signup" | null>(null);
   const [err, setErr] = useState<string | null>(null);
-
-  // すでにログイン済みなら /album へ
-  useEffect(() => {
-    (async () => {
-      try {
-        const res = await fetch(`${API_BASE}/auth/me`, {
-          method: "GET",
-          credentials: "include",
-          cache: "no-store",
-        });
-        if (res.ok) router.replace("/album");
-      } catch {
-        /* ignore */
-      }
-    })();
-  }, [router]);
 
   // 共通送信ハンドラ（action は 'login' or 'signup'）
   const submit = async (action: "login" | "signup") => {
@@ -97,7 +81,7 @@ export default function AuthPage() {
         {/* 入力2行（メール、パスワード） */}
         <div className="mt-6 space-y-3">
           <input
-            type="email"
+            type="text" // PoC用になんでも通す
             inputMode="email"
             autoComplete="email"
             placeholder="you@example.com"
@@ -108,6 +92,7 @@ export default function AuthPage() {
           />
           <input
             type="password"
+            minLength={3} // PoC用に3文字でok
             autoComplete="current-password"
             placeholder="パスワード"
             className="w-full rounded-xl border border-rose-200 px-3 py-2 outline-none focus:ring-2 focus:ring-rose-300"
