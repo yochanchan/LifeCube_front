@@ -55,8 +55,8 @@ export default function AuthPage() {
         throw new Error(msg);
       }
 
-      // 成功 → /album へ
-      router.push("/album");
+      // 成功 → /トップページ へ
+      router.push("/");
     } catch (e: any) {
       setErr(e?.message ?? String(e));
     } finally {

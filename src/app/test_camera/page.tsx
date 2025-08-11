@@ -22,6 +22,7 @@ async function uploadSnapshot(blob: Blob, contentType: string) {
 
   const res = await fetch(`${API_BASE}/api/pictures`, {
     method: 'POST',
+    credentials: "include", // ← Cookie を受け取る/送るのに必須
     body: fd,
   });
   if (!res.ok) {
