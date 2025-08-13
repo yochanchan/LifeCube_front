@@ -1,4 +1,4 @@
-// app/album/AlbumClient.tsx
+// src/app/album/AlbumClient.tsx
 "use client";
 
 import React, { useEffect, useState } from "react";
@@ -67,11 +67,7 @@ const endpoints = {
     const q = params.toString();
     return `${API_BASE}/api/pictures/dates${q ? `?${q}` : ""}`;
   },
-  byDate: (
-    date: string,
-    tripId?: string | null,
-    thumbW: number = DEFAULT_THUMB_W
-  ) => {
+  byDate: (date: string, tripId?: string | null, thumbW: number = DEFAULT_THUMB_W) => {
     const params = new URLSearchParams({ date, thumb_w: String(thumbW) });
     if (tripId) params.set("trip_id", tripId);
     return `${API_BASE}/api/pictures/by-date?${params.toString()}`;
@@ -97,7 +93,7 @@ export default function AlbumClient({
 }) {
   const router = useRouter();
 
-  // 認証ガード：未ログインなら /login に即リダイレクト
+  // 認証チェック：未ログインなら /login へ（Hooks は常にトップレベルで宣言）
   const [me, setMe] = useState<{ account_id: number; email: string; role: string } | null>(null);
   const [authChecked, setAuthChecked] = useState(false);
 
@@ -123,23 +119,14 @@ export default function AlbumClient({
     };
   }, [router]);
 
-  // CSRのクエリは先に読んでOK（SWRは authChecked&me が整うまで発火させない）
+  const authReady = authChecked && !!me;
+
+  // CSRでクエリを読む
   const searchParams = useSearchParams();
   const tripId = searchParams.get("trip_id"); // string | null
 
-  // me が確定するまでUIを出さない（SWRも走らない）
-  if (!authChecked || !me) {
-    return (
-      <main className="min-h-screen grid place-items-center">
-        <div className="rounded-xl bg-white/80 p-4 ring-1 ring-rose-100 text-rose-700">
-          認証確認中…
-        </div>
-      </main>
-    );
-  }
-
-  /** 日付一覧（SWR：ログイン確認後にだけ発火） */
-  const datesKey = authChecked && me ? endpoints.dates(tripId) : null;
+  /** 日付一覧（SWR）— 認証前は key を null にして発火させない */
+  const datesKey = authReady ? endpoints.dates(tripId) : null;
   const {
     data: dates = initial.dates,
     error: errorDates,
@@ -154,9 +141,9 @@ export default function AlbumClient({
     }
   }, [dates, selectedDate]);
 
-  /** 写真一覧（選択日付が決まっている場合のみ） */
+  /** 写真一覧（選択日付が決まっており、かつ認証OKのときのみ） */
   const picsKey =
-    authChecked && me && selectedDate ? endpoints.byDate(selectedDate, tripId, DEFAULT_THUMB_W) : null;
+    authReady && selectedDate ? endpoints.byDate(selectedDate, tripId, DEFAULT_THUMB_W) : null;
   const {
     data: pictures = initial.pictures,
     error: errorPics,
@@ -165,32 +152,40 @@ export default function AlbumClient({
 
   return (
     <main className="min-h-screen bg-gradient-to-b from-rose-50 via-pink-50 to-purple-50">
-      <div className="mx-auto max-w-6xl px-4 py-8">
-        <HeaderCute />
+      {!authReady ? (
+        <div className="min-h-[40vh] grid place-items-center">
+          <div className="rounded-xl bg-white/80 p-4 ring-1 ring-rose-100 text-rose-700">
+            認証確認中…
+          </div>
+        </div>
+      ) : (
+        <div className="mx-auto max-w-6xl px-4 py-8">
+          <HeaderCute />
 
-        {/* 日付セレクタ */}
-        <section className="mt-6">
-          <h2 className="text-lg font-semibold text-rose-700">アルバム日付</h2>
-          <DateChips
-            dates={dates ?? []}
-            loading={!!loadingDates}
-            error={errorDates ? (errorDates as Error).message : null}
-            selected={selectedDate}
-            onSelect={setSelectedDate}
-          />
-        </section>
+          {/* 日付セレクタ */}
+          <section className="mt-6">
+            <h2 className="text-lg font-semibold text-rose-700">アルバム日付</h2>
+            <DateChips
+              dates={dates ?? []}
+              loading={!!loadingDates}
+              error={errorDates ? (errorDates as Error).message : null}
+              selected={selectedDate}
+              onSelect={setSelectedDate}
+            />
+          </section>
 
-        {/* 写真グリッド（削除ボタン付き） */}
-        <section className="mt-6">
-          <h2 className="sr-only">写真一覧</h2>
-          <PicturesGrid
-            items={pictures ?? []}
-            loading={!!loadingPics}
-            error={errorPics ? (errorPics as Error).message : null}
-            swrKey={picsKey}
-          />
-        </section>
-      </div>
+          {/* 写真グリッド（削除ボタン付き） */}
+          <section className="mt-6">
+            <h2 className="sr-only">写真一覧</h2>
+            <PicturesGrid
+              items={pictures ?? []}
+              loading={!!loadingPics}
+              error={errorPics ? (errorPics as Error).message : null}
+              swrKey={picsKey}
+            />
+          </section>
+        </div>
+      )}
     </main>
   );
 }
@@ -333,6 +328,7 @@ function PicturesGrid({
                 rel="noreferrer noopener"
                 className="block"
               >
+                {/* Lint の警告が出る場合は next/image への置き換えを検討 */}
                 <img
                   src={thumbSrc}
                   alt={p.user_comment ?? p.situation_for_quiz ?? p.pictured_at}
