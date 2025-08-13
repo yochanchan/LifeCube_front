@@ -8,21 +8,13 @@ const API_BASE_RAW = process.env.NEXT_PUBLIC_API_ENDPOINT;
 const API_BASE = (API_BASE_RAW ?? '').replace(/\/+$/, '');
 
 async function uploadSnapshot(blob: Blob, contentType: string) {
-  // 固定値（PoC要件）
-  const accountId = '1';
-  const deviceId = 'yochan';
-  const picturedAt = new Date().toISOString(); // 送らなくてもOK（サーバがJST現在時刻を使用）
-
   const fd = new FormData();
   fd.append('file', blob, contentType === 'image/png' ? 'snapshot.png' : 'snapshot.jpg');
-  fd.append('account_id', accountId);
-  fd.append('device_id', deviceId);
-  // trip_id は null 想定 → 送らない
-  fd.append('pictured_at', picturedAt);
+  // trip_id / account_id / device_id / pictured_at は送らない（サーバ側で処理）
 
   const res = await fetch(`${API_BASE}/api/pictures`, {
     method: 'POST',
-    credentials: "include", // ← Cookie を受け取る/送るのに必須
+    credentials: 'include', // ← Cookie を受け取る/送るのに必須
     body: fd,
   });
   if (!res.ok) {

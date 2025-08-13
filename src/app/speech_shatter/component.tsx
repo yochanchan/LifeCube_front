@@ -26,9 +26,9 @@ const SpeechShatterComponent = () => {
       console.error("環境変数 NEXT_PUBLIC_WS_URL が設定されていません。");
       return;
     }
-    
+
     console.log("接続先のWebSocket URL:", wsUrl);
-    
+
     // ▼▼▼【変更点2】URLの動的生成ロジックを削除し、環境変数を直接使用 ▼▼▼
     socketRef.current = new WebSocket(wsUrl);
 
@@ -48,7 +48,7 @@ const SpeechShatterComponent = () => {
     socketRef.current.onclose = () => {
       console.warn("WebSocket接続が終了しました。");
       if (!isInitialAttempt.current && isRecording) {
-          setStatusMessage('エラー: WebSocket接続が切れました。');
+        setStatusMessage('エラー: WebSocket接続が切れました。');
       }
     };
 
@@ -62,48 +62,48 @@ const SpeechShatterComponent = () => {
 
   const sendBlobToServer = (blob: Blob) => {
     if (blob.size === 0) return;
-    
+
     const formData = new FormData();
     formData.append('audio_file', blob, 'recording.webm');
 
     // ▼▼▼【変更点3】HTTP APIのURLもチームの環境変数名に合わせて修正 ▼▼▼
     const apiEndpoint = process.env.NEXT_PUBLIC_API_ENDPOINT;
-    const fetchUrl = `${apiEndpoint}/transcribe_audio`;
+    const fetchUrl = `${apiEndpoint}/speech/transcribe_audio`;
 
     fetch(fetchUrl, {
       method: 'POST',
       body: formData,
     })
-    .then(response => response.json())
-    .then(data => {
-      if (data.success && data.transcription) {
-        const newTranscript = data.transcription;
-        setFinalTranscript(prev => prev + newTranscript + ' ');
+      .then(response => response.json())
+      .then(data => {
+        if (data.success && data.transcription) {
+          const newTranscript = data.transcription;
+          setFinalTranscript(prev => prev + newTranscript + ' ');
 
-        const triggerWord = "シャッター";
-        if (newTranscript.includes(triggerWord)) {
-          console.log("「シャッター」を検知！ 写真撮影命令を送信します。");
-          setStatusMessage("「シャッター」を検知！ 写真撮影命令を送信しました。");
-          
-          const socket = socketRef.current;
-          if (socket && socket.readyState === WebSocket.OPEN) {
-            socket.send(
-              JSON.stringify({
-                type: "chat",
-                message: "take_photo",
-              })
-            );
-            console.log("WebSocketメッセージ 'take_photo' を送信しました。");
-          } else {
-            console.error("WebSocketが接続されていないため、命令を送信できません。");
-            setStatusMessage("エラー: WebSocket接続が確立されていません。");
+          const triggerWord = "シャッター";
+          if (newTranscript.includes(triggerWord)) {
+            console.log("「シャッター」を検知！ 写真撮影命令を送信します。");
+            setStatusMessage("「シャッター」を検知！ 写真撮影命令を送信しました。");
+
+            const socket = socketRef.current;
+            if (socket && socket.readyState === WebSocket.OPEN) {
+              socket.send(
+                JSON.stringify({
+                  type: "chat",
+                  message: "take_photo",
+                })
+              );
+              console.log("WebSocketメッセージ 'take_photo' を送信しました。");
+            } else {
+              console.error("WebSocketが接続されていないため、命令を送信できません。");
+              setStatusMessage("エラー: WebSocket接続が確立されていません。");
+            }
           }
         }
-      }
-    })
-    .catch(error => {
-      console.error('文字起こしAPIへの送信エラー:', error);
-    });
+      })
+      .catch(error => {
+        console.error('文字起こしAPIへの送信エラー:', error);
+      });
   };
 
   // ... (以降の processAndRestart, startAutoRecording, stopAutoRecording, return文は変更ありません)
@@ -121,7 +121,7 @@ const SpeechShatterComponent = () => {
     setStatusMessage('音声認識中...');
     if (isRecording) return;
     setFinalTranscript('');
-    
+
     try {
       streamRef.current = await navigator.mediaDevices.getUserMedia({ audio: true });
       setIsRecording(true);
@@ -131,7 +131,7 @@ const SpeechShatterComponent = () => {
         type: 'audio',
         mimeType: 'audio/webm;codecs=opus',
       } as any);
-      
+
       recorder.current.startRecording();
       intervalRef.current = setInterval(processAndRestart, 2000);
 
@@ -143,8 +143,8 @@ const SpeechShatterComponent = () => {
 
   const stopAutoRecording = () => {
     if (!isRecording || !recorder.current) return;
-    
-    if(socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
+
+    if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
       setStatusMessage('認識待機中（下のボタンで開始）');
     }
 
@@ -152,27 +152,27 @@ const SpeechShatterComponent = () => {
       clearInterval(intervalRef.current);
       intervalRef.current = null;
     }
-    
+
     recorder.current.stopRecording(() => {
-        const lastBlob = recorder.current!.getBlob();
-        if (lastBlob.size > 0) {
-          sendBlobToServer(lastBlob);
-        }
-  
-        recorder.current!.destroy();
-        recorder.current = null;
-        streamRef.current?.getTracks().forEach(track => track.stop());
-        streamRef.current = null;
-      });
-  
-      setIsRecording(false);
-      console.log("自動文字起こしを停止しました。");
+      const lastBlob = recorder.current!.getBlob();
+      if (lastBlob.size > 0) {
+        sendBlobToServer(lastBlob);
+      }
+
+      recorder.current!.destroy();
+      recorder.current = null;
+      streamRef.current?.getTracks().forEach(track => track.stop());
+      streamRef.current = null;
+    });
+
+    setIsRecording(false);
+    console.log("自動文字起こしを停止しました。");
   };
 
 
   return (
     <div style={{ padding: '20px', fontFamily: 'sans-serif' }}>
-      <button 
+      <button
         onClick={isRecording ? stopAutoRecording : startAutoRecording}
         style={{ padding: '10px 20px', fontSize: '16px', cursor: 'pointer', marginBottom: '20px' }}
       >
