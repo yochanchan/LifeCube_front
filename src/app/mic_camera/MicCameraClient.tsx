@@ -1,159 +1,227 @@
 // src/app/mic_camera/MicCameraClient.tsx
 "use client";
 
-import React, { useEffect, useState } from "react";
-import dynamic from "next/dynamic";
+import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import CameraPreview from "./components/CameraPreview";
-
-// SpeechController はブラウザ専用依存(RecordRTC)を持つため、SSR無効で読み込み
-const SpeechController = dynamic(() => import("./components/SpeechController"), { ssr: false });
+import SpeechController from "./components/SpeechController";
 
 const API_BASE = (process.env.NEXT_PUBLIC_API_ENDPOINT ?? "").replace(/\/+$/, "");
+const WS_BASE = process.env.NEXT_PUBLIC_WS_URL ?? "";
+const DEFAULT_REGION = process.env.NEXT_PUBLIC_AZURE_SPEECH_REGION ?? "japaneast";
 
-// ─────────────────────────────────────────────
-// ここから下は「libを使わない」ための内蔵ヘルパ
-// ─────────────────────────────────────────────
-
-/** 環境変数 NEXT_PUBLIC_WS_URL が「オリジンのみ」の場合に /camera/ws を付与して URL を返す */
-function buildCameraWsUrl(): URL | null {
-  const raw = (process.env.NEXT_PUBLIC_WS_URL ?? "").trim();
-  if (!raw) return null;
+function getOrCreateDeviceId(): string {
   try {
-    const u = new URL(raw);
-    if (!u.pathname || u.pathname === "/") {
-      u.pathname = "/camera/ws";
-    }
-    return u;
-  } catch {
-    return null; // 不正なURL
-  }
-}
-
-/** ブラウザでのみ device_id を取得/生成（SSRでは呼ばない） */
-function getDeviceIdClient(): string {
-  const KEY = "device_uid_v1";
-  try {
-    let id = window.localStorage.getItem(KEY);
+    const KEY = "device_uid";
+    let id = localStorage.getItem(KEY);
     if (!id) {
-      const rnd =
-        window.crypto && "randomUUID" in window.crypto
-          ? window.crypto.randomUUID()
-          : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
-      id = `dev_${rnd}`;
-      window.localStorage.setItem(KEY, id);
+      id = crypto.randomUUID();
+      localStorage.setItem(KEY, id);
     }
     return id;
   } catch {
-    return `dev_fallback_${Date.now().toString(36)}`;
+    return "unknown";
   }
 }
 
-// ─────────────────────────────────────────────
+type Me = { account_id: number; email: string; role: string };
 
 export default function MicCameraClient() {
-  const [ws, setWs] = useState<WebSocket | null>(null);
-  const [room, setRoom] = useState<string | null>(null);
-  const [status, setStatus] = useState<string>("初期化中…");
+  const router = useRouter();
 
-  // SSR中に localStorage を触らないよう、マウント後に deviceId を取得
-  const [myDeviceId, setMyDeviceId] = useState<string | null>(null);
+  // Hooks（順序不変）
+  const [me, setMe] = useState<Me | null>(null);
+  const [authChecked, setAuthChecked] = useState(false);
+  const [status, setStatus] = useState("初期化中…");
+  const [recActive, setRecActive] = useState(false);
+  const wsRef = useRef<WebSocket | null>(null);
+
+  const [liveText, setLiveText] = useState<string>(""); // interim
+  const [finalLines, setFinalLines] = useState<{ text: string; ts: number }[]>([]); // final履歴
+  const [triggerMsg, setTriggerMsg] = useState<string | null>(null); // バナー表示用
+  const triggerTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const myDeviceId = useMemo(getOrCreateDeviceId, []);
+  const room = me ? `acc:${me.account_id}` : null;
+  const authReady = authChecked && !!me;
+
+  // 認証チェック
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      setMyDeviceId(getDeviceIdClient());
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`${API_BASE}/auth/me`, {
+          credentials: "include",
+          cache: "no-store",
+        });
+        if (!res.ok) throw new Error("not authenticated");
+        const j = (await res.json()) as Me;
+        if (!cancelled) {
+          setMe(j);
+          setStatus("準備完了");
+        }
+      } catch {
+        if (!cancelled) {
+          setStatus("未ログインのため /login に移動します");
+          router.replace(`/login?next=/mic_camera`);
+        }
+      } finally {
+        if (!cancelled) setAuthChecked(true);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [router]);
+
+  // WS 接続
+  useEffect(() => {
+    if (!authReady || !room || !WS_BASE) return;
+    const raw = WS_BASE;                // 例: ws://localhost:8000
+    const url = new URL(raw);
+    if (!url.pathname || url.pathname === "/") {
+      url.pathname = "/camera/ws";      // パスが無い/ルートなら補正
+    }
+    url.searchParams.set("room", room);
+    url.searchParams.set("device_id", myDeviceId);
+
+    const ws = new WebSocket(url.toString());
+    wsRef.current = ws;
+
+    ws.onopen = () => console.log("[mic_camera] WS connected:", room);
+    ws.onerror = (e) => console.warn("[mic_camera] WS error:", e);
+    ws.onclose = () => console.warn("[mic_camera] WS closed");
+
+    return () => {
+      try { ws.close(); } catch { }
+      wsRef.current = null;
+    };
+  }, [authReady, room, myDeviceId]);
+
+  // 発火：ローカル + WS
+  const broadcastTakePhoto = useCallback(() => {
+    window.dispatchEvent(new Event("mic-camera:take_photo"));
+    const ws = wsRef.current;
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ type: "take_photo", origin_device_id: myDeviceId, ts: Date.now() }));
+    }
+  }, [myDeviceId]);
+
+  // 文字起こし/発火の受け口
+  const handleTranscript = useCallback((p: { text: string; isFinal: boolean; ts: number }) => {
+    if (p.isFinal) {
+      setLiveText("");
+      setFinalLines(prev => {
+        const next = [...prev, { text: p.text, ts: p.ts }];
+        return next.slice(-20); // 直近20行に制限
+      });
+    } else {
+      setLiveText(p.text);
     }
   }, []);
 
-  // 認証 → room 決定 → WS 接続
+  const handleTrigger = useCallback((p: { keyword: string; source: "interim" | "final"; text: string; ts: number }) => {
+    broadcastTakePhoto();
+    // バナー表示
+    setTriggerMsg(`キーワード：「${p.keyword}」により撮影されました`);
+    if (triggerTimerRef.current) clearTimeout(triggerTimerRef.current);
+    triggerTimerRef.current = setTimeout(() => setTriggerMsg(null), 4000);
+  }, [broadcastTakePhoto]);
+
+  // アンマウント時にタイマークリア
   useEffect(() => {
-    if (!myDeviceId) return; // deviceId 準備待ち
-    let closed = false;
-
-    async function boot() {
-      try {
-        const me = await fetch(`${API_BASE}/auth/me`, {
-          credentials: "include",
-          cache: "no-store",
-        }).then((r) => (r.ok ? r.json() : Promise.reject(r)));
-
-        const r = `acc:${me.account_id}`;
-        setRoom(r);
-
-        const url = buildCameraWsUrl();
-        if (!url) {
-          setStatus("WS未設定（ローカルのみ動作）");
-          return;
-        }
-
-        url.searchParams.set("room", r);
-        url.searchParams.set("device_id", myDeviceId);
-
-        const w = new WebSocket(url.toString());
-        setWs(w);
-
-        w.onopen = () => setStatus("WS接続: OK");
-        w.onclose = () => !closed && setStatus("WS切断（ローカルは動作）");
-        w.onerror = () => setStatus("WSエラー（ローカルは動作）");
-      } catch {
-        setStatus("未ログインです。/login からログインしてください。");
-      }
-    }
-
-    boot();
     return () => {
-      closed = true;
-      setWs((prev) => {
-        prev?.close();
-        return null;
-      });
+      if (triggerTimerRef.current) clearTimeout(triggerTimerRef.current);
     };
-  }, [myDeviceId]);
+  }, []);
 
-  // 合言葉検知（SpeechController → 親）で実行する処理
-  const onShutterDetected = () => {
-    // 1) ローカル即時（同一タブ）
-    window.dispatchEvent(new Event("mic-camera:take_photo"));
-    // 2) WSブロードキャスト（同一roomの他端末へ）
-    if (ws && ws.readyState === WebSocket.OPEN && room && myDeviceId) {
-      ws.send(
-        JSON.stringify({
-          type: "take_photo",
-          origin_device_id: myDeviceId,
-          ts: Date.now(),
-        })
-      );
-    }
-  };
-
+  // レイアウト：スマホ前提で縦並び（上：カメラ / 下：テキスト）
   return (
     <main className="min-h-screen bg-gradient-to-b from-rose-50 via-pink-50 to-purple-50">
-      <div className="mx-auto max-w-6xl px-4 py-6">
-        <header className="flex items-center gap-3 rounded-2xl bg-white/80 p-4 shadow-sm ring-1 ring-rose-100">
-          <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-rose-200 text-rose-800 shadow-inner">
-            🎤
-          </span>
-          <h1 className="text-2xl font-extrabold tracking-tight text-rose-800">
-            Mic + Camera（統合）
-          </h1>
-          <div className="ml-auto text-sm text-rose-600">{status}</div>
-        </header>
-
-        <section className="mt-6 grid grid-cols-1 gap-6 md:grid-cols-2">
-          {/* 左：カメラ */}
-          <div className="rounded-2xl bg-white/70 p-4 shadow ring-1 ring-rose-100">
-            <h2 className="mb-2 text-lg font-semibold text-rose-700">Camera</h2>
-            {myDeviceId ? <CameraPreview ws={ws} myDeviceId={myDeviceId} /> : <div>準備中…</div>}
+      {!authReady ? (
+        <div className="mx-auto max-w-5xl p-4">
+          <div className="rounded-xl bg-white/80 p-4 ring-1 ring-rose-100 text-rose-700">
+            {status}
           </div>
+        </div>
+      ) : (
+        <div className="mx-auto max-w-md p-4 space-y-4 sm:max-w-lg">
+          {/* ヘッダー */}
+          <header className="rounded-2xl bg-white/70 p-4 shadow-sm ring-1 ring-rose-100">
+            <div className="flex flex-wrap items-center gap-2">
+              <h1 className="text-xl font-bold text-rose-800">Mic &amp; Camera</h1>
+              <span className="ml-auto rounded-full bg-rose-100 px-2 py-0.5 text-xs text-rose-700">
+                account_id: <strong>{me!.account_id}</strong>
+              </span>
+              <span className="rounded-full bg-rose-100 px-2 py-0.5 text-xs text-rose-700">
+                room_id: <strong>{room}</strong>
+              </span>
+            </div>
 
-          {/* 右：マイク */}
-          <div className="rounded-2xl bg-white/70 p-4 shadow ring-1 ring-rose-100">
-            <h2 className="mb-2 text-lg font-semibold text-rose-700">Speech</h2>
-            <SpeechController apiBase={API_BASE} onShutterDetected={onShutterDetected} />
-            <p className="mt-3 text-xs text-rose-500">
-              合言葉「シャッター」で撮影。ローカル即時 + 同アカウント内端末にWS配信。
-            </p>
-          </div>
-        </section>
-      </div>
+            <div className="mt-3 flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setRecActive(v => !v)}
+                className={
+                  "rounded-full px-4 py-2 text-white transition " +
+                  (recActive ? "bg-rose-600 hover:bg-rose-700" : "bg-rose-500 hover:bg-rose-600")
+                }
+                aria-pressed={recActive}
+                title={recActive ? "録音停止" : "録音開始"}
+              >
+                {recActive ? "■ 録音停止" : "▶ 録音開始"}
+              </button>
+              <p className="text-sm text-rose-600">{status}</p>
+            </div>
+          </header>
+
+          {/* バナー（トリガー通知） */}
+          {triggerMsg && (
+            <div className="rounded-xl bg-emerald-50 p-3 text-emerald-800 ring-1 ring-emerald-100">
+              {triggerMsg}
+            </div>
+          )}
+
+          {/* 上：カメラ */}
+          <section aria-label="カメラ" className="rounded-2xl bg-white p-2 shadow-sm ring-1 ring-rose-100">
+            <CameraPreview apiBase={API_BASE} wsRef={wsRef} myDeviceId={myDeviceId} />
+          </section>
+
+          {/* 下：文字起こし＋結果 */}
+          <section aria-label="文字起こし" className="rounded-2xl bg-white/80 p-3 shadow-sm ring-1 ring-rose-100">
+            <h2 className="text-sm font-semibold text-rose-700">文字起こし（リアルタイム）</h2>
+
+            {/* interim ライブ表示 */}
+            <div className="mt-2 rounded-lg bg-rose-50 px-3 py-2 text-rose-800 min-h-[44px]">
+              {liveText ? liveText : <span className="text-rose-400">（発話待機中）</span>}
+            </div>
+
+            {/* final 履歴 */}
+            <div className="mt-3 max-h-60 overflow-y-auto rounded-lg bg-white ring-1 ring-rose-100">
+              {finalLines.length === 0 ? (
+                <div className="p-3 text-sm text-rose-400">（確定テキストはまだありません）</div>
+              ) : (
+                <ul className="divide-y divide-rose-100">
+                  {finalLines.map((l, i) => (
+                    <li key={l.ts + ":" + i} className="p-3 text-sm text-rose-800">
+                      {new Date(l.ts).toLocaleTimeString()}：{l.text}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </section>
+
+          {/* Speech コントローラ（UIなし） */}
+          <SpeechController
+            apiBase={API_BASE}
+            defaultRegion={DEFAULT_REGION}
+            active={recActive}
+            onTranscript={handleTranscript}
+            onTrigger={handleTrigger}
+            onStatusChange={(s, d) => console.log("[Speech]", s, d ?? "")}
+            cooldownMs={5000} // PoC要件：送信側クールダウン5秒
+          />
+        </div>
+      )}
     </main>
   );
 }

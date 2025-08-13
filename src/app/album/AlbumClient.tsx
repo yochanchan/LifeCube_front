@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import useSWR, { useSWRConfig } from "swr";
 import Link from "next/link";
 
@@ -95,12 +95,51 @@ export default function AlbumClient({
     pictures?: PictureMeta[];
   };
 }) {
-  // ← CSRでクエリを読む（方針B）
+  const router = useRouter();
+
+  // 認証ガード：未ログインなら /login に即リダイレクト
+  const [me, setMe] = useState<{ account_id: number; email: string; role: string } | null>(null);
+  const [authChecked, setAuthChecked] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`${API_BASE}/auth/me`, {
+          credentials: "include",
+          cache: "no-store",
+        });
+        if (!res.ok) throw new Error("unauth");
+        const j = await res.json();
+        if (!cancelled) setMe(j);
+      } catch {
+        if (!cancelled) router.replace(`/login?next=/album`);
+      } finally {
+        if (!cancelled) setAuthChecked(true);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [router]);
+
+  // CSRのクエリは先に読んでOK（SWRは authChecked&me が整うまで発火させない）
   const searchParams = useSearchParams();
   const tripId = searchParams.get("trip_id"); // string | null
 
-  /** 日付一覧（SWR） */
-  const datesKey = endpoints.dates(tripId);
+  // me が確定するまでUIを出さない（SWRも走らない）
+  if (!authChecked || !me) {
+    return (
+      <main className="min-h-screen grid place-items-center">
+        <div className="rounded-xl bg-white/80 p-4 ring-1 ring-rose-100 text-rose-700">
+          認証確認中…
+        </div>
+      </main>
+    );
+  }
+
+  /** 日付一覧（SWR：ログイン確認後にだけ発火） */
+  const datesKey = authChecked && me ? endpoints.dates(tripId) : null;
   const {
     data: dates = initial.dates,
     error: errorDates,
@@ -116,7 +155,8 @@ export default function AlbumClient({
   }, [dates, selectedDate]);
 
   /** 写真一覧（選択日付が決まっている場合のみ） */
-  const picsKey = selectedDate ? endpoints.byDate(selectedDate, tripId, DEFAULT_THUMB_W) : null;
+  const picsKey =
+    authChecked && me && selectedDate ? endpoints.byDate(selectedDate, tripId, DEFAULT_THUMB_W) : null;
   const {
     data: pictures = initial.pictures,
     error: errorPics,
