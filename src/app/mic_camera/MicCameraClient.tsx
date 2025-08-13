@@ -8,7 +8,7 @@ import SpeechController from "./components/SpeechController";
 
 const API_BASE = (process.env.NEXT_PUBLIC_API_ENDPOINT ?? "").replace(/\/+$/, "");
 const WS_BASE = process.env.NEXT_PUBLIC_WS_URL ?? "";
-const DEFAULT_REGION = process.env.NEXT_PUBLIC_AZURE_SPEECH_REGION ?? "japaneast";
+const DEFAULT_REGION = "japaneast";
 
 function getOrCreateDeviceId(): string {
   try {
