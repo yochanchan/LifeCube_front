@@ -1,6 +1,7 @@
+// src/app/mic_camera/components/CameraPreview.tsx
 "use client";
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 
 type Props = {
   apiBase: string;
@@ -9,160 +10,159 @@ type Props = {
 };
 
 export default function CameraPreview({ apiBase, wsRef, myDeviceId }: Props) {
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [stream, setStream] = useState<MediaStream | null>(null);
-  const [uploading, setUploading] = useState(false);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+
+  const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
 
-  // getUserMedia → video
+  // カメラ起動
   useEffect(() => {
     let cancelled = false;
+
     (async () => {
       try {
         const s = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: { ideal: "environment" } },
+          video: { facingMode: "environment" },
+          audio: false,
         });
         if (cancelled) {
           s.getTracks().forEach((t) => t.stop());
           return;
         }
-        setStream(s);
-      } catch (e) {
-        console.error("getUserMedia failed", e);
-        setMsg("カメラを開始できませんでした（権限/デバイスの確認）");
+        streamRef.current = s;
+        if (videoRef.current) {
+          videoRef.current.srcObject = s;
+          await videoRef.current.play().catch(() => { });
+        }
+      } catch (e: any) {
+        setMsg(`カメラの起動に失敗しました: ${e?.message ?? String(e)}`);
       }
     })();
+
     return () => {
       cancelled = true;
-      stream?.getTracks().forEach((t) => t.stop());
+      const s = streamRef.current;
+      if (s) s.getTracks().forEach((t) => t.stop());
+      streamRef.current = null;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // video に stream を貼る
-  useEffect(() => {
-    const v = videoRef.current;
-    if (!v || !stream) return;
+  // 撮影 & アップロード
+  const snapAndUpload = useCallback(async () => {
+    if (busy) return;
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    if (!video || !canvas) return;
 
-    v.srcObject = stream;
-    const onLoaded = () => {
-      const c = canvasRef.current;
-      if (c) {
-        c.width = v.videoWidth || 640;
-        c.height = v.videoHeight || 480;
+    try {
+      setBusy(true);
+      setMsg(null);
+
+      const w = video.videoWidth || 1280;
+      const h = video.videoHeight || 720;
+      canvas.width = w;
+      canvas.height = h;
+
+      const ctx = canvas.getContext("2d");
+      if (!ctx) throw new Error("canvas context 取得に失敗しました");
+
+      ctx.drawImage(video, 0, 0, w, h);
+
+      const blob: Blob = await new Promise((resolve, reject) => {
+        canvas.toBlob(
+          (b) => (b ? resolve(b) : reject(new Error("toBlob 失敗"))),
+          "image/jpeg",
+          0.92
+        );
+      });
+
+      const fd = new FormData();
+      fd.append("file", blob, `snap_${Date.now()}.jpg`);
+      // 任意: device_id を送りたい場合（サーバ側が無視してもOK）
+      fd.append("device_id", myDeviceId);
+
+      const res = await fetch(`${apiBase}/api/pictures`, {
+        method: "POST",
+        body: fd,
+        credentials: "include",
+      });
+
+      if (!res.ok) {
+        const text = await res.text().catch(() => "");
+        throw new Error(`アップロード失敗: ${res.status} ${res.statusText} ${text}`);
       }
-    };
-    v.addEventListener("loadedmetadata", onLoaded);
-    v.play().catch(() => { });
-    return () => v.removeEventListener("loadedmetadata", onLoaded);
-  }, [stream]);
 
-  // ローカルイベント（同一タブ）
+      setMsg("アップロードしました");
+      setTimeout(() => setMsg(null), 2000);
+    } catch (e: any) {
+      setMsg(e?.message ?? String(e));
+    } finally {
+      setBusy(false);
+    }
+  }, [apiBase, myDeviceId, busy]);
+
+  // ローカルイベント → 撮影
   useEffect(() => {
-    const handler = () => {
+    const onLocal = () => {
       void snapAndUpload();
     };
-    window.addEventListener("mic-camera:take_photo", handler);
-    return () => window.removeEventListener("mic-camera:take_photo", handler);
-  }, []);
+    window.addEventListener("mic-camera:take_photo", onLocal);
+    return () => {
+      window.removeEventListener("mic-camera:take_photo", onLocal);
+    };
+  }, [snapAndUpload]);
 
-  // WS受信（同room・他端末） → 自分発（origin_device_id一致）は無視
+  // WS受信 → 撮影（自端末は無視）
   useEffect(() => {
     const ws = wsRef.current;
     if (!ws) return;
 
-    const onMsg = (ev: MessageEvent) => {
+    const onMessage = (ev: MessageEvent) => {
       try {
-        const data = JSON.parse(ev.data);
-        if (data?.type === "take_photo") {
-          if (data.origin_device_id && data.origin_device_id === myDeviceId) {
-            // 自分発は無視
-            return;
-          }
+        const msg = JSON.parse(ev.data);
+        if (msg?.type === "take_photo" && msg.origin_device_id !== myDeviceId) {
           void snapAndUpload();
         }
       } catch {
-        // noop
+        /* noop */
       }
     };
 
-    ws.addEventListener("message", onMsg);
-    return () => ws.removeEventListener("message", onMsg);
-  }, [wsRef, myDeviceId]);
-
-  // 撮影 → アップロード
-  const snapAndUpload = async () => {
-    setMsg(null);
-    let blob: Blob | null = null;
-
-    // 1) ImageCapture 高解像度（あれば）
-    try {
-      const track = stream?.getVideoTracks()[0];
-      if (track && "ImageCapture" in window) {
-        // @ts-ignore
-        const ic = new window.ImageCapture(track);
-        blob = await ic.takePhoto();
-      }
-    } catch (e) {
-      console.warn("ImageCapture failed", e);
-    }
-
-    // 2) Canvas フォールバック
-    if (!blob) {
-      const v = videoRef.current;
-      const c = canvasRef.current;
-      if (!v || !c) return;
-      c.width = v.videoWidth || 640;
-      c.height = v.videoHeight || 480;
-      c.getContext("2d")?.drawImage(v, 0, 0, c.width, c.height);
-      const dataUrl = c.toDataURL("image/jpeg", 0.92);
-      const r = await fetch(dataUrl);
-      blob = await r.blob();
-    }
-
-    // 3) Upload（pictures.pyは account_id/ pictured_at をサーバ側で補完）
-    try {
-      setUploading(true);
-      const fd = new FormData();
-      fd.append("file", blob, blob.type === "image/png" ? "snapshot.png" : "snapshot.jpg");
-      const res = await fetch(`${apiBase}/api/pictures`, {
-        method: "POST",
-        credentials: "include",
-        body: fd,
-      });
-      if (!res.ok) {
-        const text = await res.text().catch(() => "");
-        throw new Error(`upload failed: ${res.status} ${res.statusText} ${text}`);
-      }
-      const j = await res.json();
-      setMsg(`保存しました（picture_id=${j.picture_id}）`);
-    } catch (e: any) {
-      console.error(e);
-      setMsg(e?.message ?? String(e));
-    } finally {
-      setUploading(false);
-    }
-  };
+    ws.addEventListener("message", onMessage);
+    return () => ws.removeEventListener("message", onMessage);
+  }, [wsRef, myDeviceId, snapAndUpload]);
 
   return (
-    <section className="space-y-3">
-      <div className="rounded-2xl bg-white/80 p-3 ring-1 ring-rose-100 shadow">
-        <video ref={videoRef} className="w-full rounded-xl bg-black/5" playsInline muted />
-        <canvas ref={canvasRef} className="hidden" />
+    <div className="space-y-2">
+      <div className="overflow-hidden rounded-2xl bg-black shadow ring-1 ring-rose-200">
+        <video
+          ref={videoRef}
+          playsInline
+          muted
+          autoPlay
+          className="aspect-video w-full object-cover"
+        />
       </div>
 
-      <div className="flex gap-2">
+      <div className="flex items-center gap-2">
         <button
+          type="button"
           onClick={() => void snapAndUpload()}
-          disabled={uploading}
-          className="rounded-xl bg-rose-600 px-4 py-2 text-white shadow hover:bg-rose-700 disabled:opacity-50"
+          disabled={busy}
+          className={
+            "rounded-full px-4 py-2 text-white transition " +
+            (busy ? "bg-rose-300" : "bg-rose-500 hover:bg-rose-600")
+          }
         >
-          {uploading ? "保存中…" : "📸 いま撮る"}
+          {busy ? "アップロード中…" : "手動で撮影"}
         </button>
+        {msg && <span className="text-sm text-rose-700">{msg}</span>}
       </div>
 
-      {msg && <div className="text-sm text-rose-700">{msg}</div>}
-    </section>
+      {/* 非表示の描画用キャンバス */}
+      <canvas ref={canvasRef} className="hidden" />
+    </div>
   );
 }
