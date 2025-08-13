@@ -1,129 +1,85 @@
-// frontend/src/app/mic_camera/components/CameraPreview.tsx
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
-import { useCamera } from "../hooks/useCamera";
 
-const API_BASE = (process.env.NEXT_PUBLIC_API_ENDPOINT ?? "").replace(/\/+$/, "");
-
-export default function CameraPreview({
-  ws,
-  myDeviceId,
-}: {
-  ws: WebSocket | null;
+type Props = {
+  apiBase: string;
+  wsRef: React.MutableRefObject<WebSocket | null>;
   myDeviceId: string;
-}) {
-  const { videoRef, canvasRef, capture, stream } = useCamera({
-    video: { facingMode: { ideal: "environment" } },
-  });
+};
 
-  // ライブプレビュー描画
-  const rafId = useRef<number | null>(null);
-  useEffect(() => {
-    const draw = () => {
-      if (videoRef.current && canvasRef.current) {
-        const ctx = canvasRef.current.getContext("2d");
-        if (ctx) {
-          ctx.drawImage(
-            videoRef.current,
-            0,
-            0,
-            canvasRef.current.width,
-            canvasRef.current.height
-          );
-        }
-      }
-      rafId.current = requestAnimationFrame(draw);
-    };
-    draw();
-    return () => rafId.current && cancelAnimationFrame(rafId.current);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const [photoUrl, setPhotoUrl] = useState<string | null>(null);
+export default function CameraPreview({ apiBase, wsRef, myDeviceId }: Props) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [stream, setStream] = useState<MediaStream | null>(null);
   const [uploading, setUploading] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
+  const [msg, setMsg] = useState<string | null>(null);
 
-  async function dataUrlToBlob(dataUrl: string): Promise<Blob> {
-    const res = await fetch(dataUrl);
-    return res.blob();
-  }
-
-  async function uploadSnapshot(blob: Blob, contentType: string) {
-    const fd = new FormData();
-    fd.append("file", blob, contentType === "image/png" ? "snapshot.png" : "snapshot.jpg");
-    // trip_id が必要になったら fd.append("trip_id", ...) を追加
-
-    const res = await fetch(`${API_BASE}/api/pictures`, {
-      method: "POST",
-      credentials: "include",
-      body: fd,
-    });
-    if (!res.ok) {
-      const text = await res.text().catch(() => "");
-      throw new Error(`upload failed: ${res.status} ${res.statusText} ${text}`);
-    }
-    return (await res.json()) as { picture_id: number; thumbnail_path: string };
-  }
-
-  const snapAndUpload = async () => {
-    setMessage(null);
-    if (photoUrl?.startsWith("blob:")) URL.revokeObjectURL(photoUrl);
-
-    let blob: Blob | null = null;
-
-    // ImageCapture 優先
-    if (stream && "ImageCapture" in window) {
-      try {
-        const track = stream.getVideoTracks()[0];
-        const ic = new (window as any).ImageCapture(track);
-        blob = await ic.takePhoto();
-      } catch (e) {
-        console.warn("ImageCapture failed, fallback to canvas", e);
-      }
-    }
-    // Canvas フォールバック
-    if (!blob) {
-      const dataUrl = capture();
-      if (!dataUrl) return;
-      blob = await dataUrlToBlob(dataUrl);
-    }
-
-    const url = URL.createObjectURL(blob);
-    setPhotoUrl(url);
-
-    try {
-      setUploading(true);
-      const ct = blob.type || "application/octet-stream";
-      const result = await uploadSnapshot(blob, ct);
-      setMessage(`保存しました (picture_id=${result.picture_id})`);
-    } catch (e: any) {
-      console.error(e);
-      setMessage(e?.message ?? String(e));
-    } finally {
-      setUploading(false);
-    }
-  };
-
-  // ① ローカルイベントで撮影
+  // getUserMedia → video
   useEffect(() => {
-    const onLocal = () => void snapAndUpload();
-    window.addEventListener("mic-camera:take_photo", onLocal);
-    return () => window.removeEventListener("mic-camera:take_photo", onLocal);
+    let cancelled = false;
+    (async () => {
+      try {
+        const s = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: { ideal: "environment" } },
+        });
+        if (cancelled) {
+          s.getTracks().forEach((t) => t.stop());
+          return;
+        }
+        setStream(s);
+      } catch (e) {
+        console.error("getUserMedia failed", e);
+        setMsg("カメラを開始できませんでした（権限/デバイスの確認）");
+      }
+    })();
+    return () => {
+      cancelled = true;
+      stream?.getTracks().forEach((t) => t.stop());
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ② WS受信で撮影（同roomの他端末からの命令）
+  // video に stream を貼る
   useEffect(() => {
+    const v = videoRef.current;
+    if (!v || !stream) return;
+
+    v.srcObject = stream;
+    const onLoaded = () => {
+      const c = canvasRef.current;
+      if (c) {
+        c.width = v.videoWidth || 640;
+        c.height = v.videoHeight || 480;
+      }
+    };
+    v.addEventListener("loadedmetadata", onLoaded);
+    v.play().catch(() => { });
+    return () => v.removeEventListener("loadedmetadata", onLoaded);
+  }, [stream]);
+
+  // ローカルイベント（同一タブ）
+  useEffect(() => {
+    const handler = () => {
+      void snapAndUpload();
+    };
+    window.addEventListener("mic-camera:take_photo", handler);
+    return () => window.removeEventListener("mic-camera:take_photo", handler);
+  }, []);
+
+  // WS受信（同room・他端末） → 自分発（origin_device_id一致）は無視
+  useEffect(() => {
+    const ws = wsRef.current;
     if (!ws) return;
 
     const onMsg = (ev: MessageEvent) => {
       try {
-        const msg = JSON.parse(ev.data);
-        if (msg?.type === "take_photo") {
-          // 念のため自分発は無視（サーバは返してこない設計だが二重防止）
-          if (msg.origin_device_id && msg.origin_device_id === myDeviceId) return;
-          if (msg.target_device_id && msg.target_device_id !== myDeviceId) return;
+        const data = JSON.parse(ev.data);
+        if (data?.type === "take_photo") {
+          if (data.origin_device_id && data.origin_device_id === myDeviceId) {
+            // 自分発は無視
+            return;
+          }
           void snapAndUpload();
         }
       } catch {
@@ -133,30 +89,80 @@ export default function CameraPreview({
 
     ws.addEventListener("message", onMsg);
     return () => ws.removeEventListener("message", onMsg);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ws, myDeviceId]);
+  }, [wsRef, myDeviceId]);
+
+  // 撮影 → アップロード
+  const snapAndUpload = async () => {
+    setMsg(null);
+    let blob: Blob | null = null;
+
+    // 1) ImageCapture 高解像度（あれば）
+    try {
+      const track = stream?.getVideoTracks()[0];
+      if (track && "ImageCapture" in window) {
+        // @ts-ignore
+        const ic = new window.ImageCapture(track);
+        blob = await ic.takePhoto();
+      }
+    } catch (e) {
+      console.warn("ImageCapture failed", e);
+    }
+
+    // 2) Canvas フォールバック
+    if (!blob) {
+      const v = videoRef.current;
+      const c = canvasRef.current;
+      if (!v || !c) return;
+      c.width = v.videoWidth || 640;
+      c.height = v.videoHeight || 480;
+      c.getContext("2d")?.drawImage(v, 0, 0, c.width, c.height);
+      const dataUrl = c.toDataURL("image/jpeg", 0.92);
+      const r = await fetch(dataUrl);
+      blob = await r.blob();
+    }
+
+    // 3) Upload（pictures.pyは account_id/ pictured_at をサーバ側で補完）
+    try {
+      setUploading(true);
+      const fd = new FormData();
+      fd.append("file", blob, blob.type === "image/png" ? "snapshot.png" : "snapshot.jpg");
+      const res = await fetch(`${apiBase}/api/pictures`, {
+        method: "POST",
+        credentials: "include",
+        body: fd,
+      });
+      if (!res.ok) {
+        const text = await res.text().catch(() => "");
+        throw new Error(`upload failed: ${res.status} ${res.statusText} ${text}`);
+      }
+      const j = await res.json();
+      setMsg(`保存しました（picture_id=${j.picture_id}）`);
+    } catch (e: any) {
+      console.error(e);
+      setMsg(e?.message ?? String(e));
+    } finally {
+      setUploading(false);
+    }
+  };
 
   return (
-    <div className="flex flex-col items-center gap-3">
-      <canvas
-        ref={canvasRef}
-        className="border shadow w-full h-auto rounded-xl"
-        style={{ maxWidth: 640 }}
-      />
-      <button
-        onClick={() => void snapAndUpload()}
-        className="rounded bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 disabled:opacity-60"
-        disabled={uploading}
-      >
-        {uploading ? "保存中…" : "📸 スナップ & 保存"}
-      </button>
-      {photoUrl && (
-        <img src={photoUrl} alt="snapshot" className="mt-2 border shadow max-w-full rounded-xl" />
-      )}
-      {message && <p className="text-sm text-gray-600">{message}</p>}
+    <section className="space-y-3">
+      <div className="rounded-2xl bg-white/80 p-3 ring-1 ring-rose-100 shadow">
+        <video ref={videoRef} className="w-full rounded-xl bg-black/5" playsInline muted />
+        <canvas ref={canvasRef} className="hidden" />
+      </div>
 
-      {/* ストリームのソース */}
-      <video ref={videoRef} style={{ display: "none" }} />
-    </div>
+      <div className="flex gap-2">
+        <button
+          onClick={() => void snapAndUpload()}
+          disabled={uploading}
+          className="rounded-xl bg-rose-600 px-4 py-2 text-white shadow hover:bg-rose-700 disabled:opacity-50"
+        >
+          {uploading ? "保存中…" : "📸 いま撮る"}
+        </button>
+      </div>
+
+      {msg && <div className="text-sm text-rose-700">{msg}</div>}
+    </section>
   );
 }
