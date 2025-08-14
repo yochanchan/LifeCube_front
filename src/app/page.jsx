@@ -179,6 +179,15 @@ export default function Home() {
               test_camera
             </button>
           </Link>
+          {/*沢田つけたし*/}
+          <Link href="/test_display">
+            <button
+              className="bg-indigo-500 hover:bg-indigo-600 text-white px-4 py-2 rounded"
+            >
+              test_display
+            </button>
+          </Link>
+          {/*沢田つけたし*/}
           <Link href="/album">
             <button
               className="bg-grey-500 hover:bg-red-600 text-white px-4 py-2 rounded"
