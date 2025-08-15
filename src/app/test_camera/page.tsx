@@ -144,12 +144,31 @@ export default function Page() {
     // WebSocket 送信（dataURL形式）
     try {
       const dataUrlForWs = canvasDataUrl ?? (await blobToDataUrl(blob));
+      //沢田つけたし
+      console.log('WebSocket送信準備完了:', {
+        isConnected,
+        dataUrlLength: dataUrlForWs.length,
+        roomId,
+        userId
+      });
+      
       if (isConnected) {
         sendPhoto(dataUrlForWs);
         sendNotification('test_camera: 新しい写真が撮影されました');
+        //沢田つけたし
+        console.log('✅ WebSocket送信完了: 写真と通知');
+        setMessage('撮影完了 & WebSocket送信完了');
+      } else {
+        console.warn('⚠️ WebSocket未接続のため送信できません');
+        setMessage('撮影完了（WebSocket未接続のため送信できません）');
+        //沢田つけたし
       }
     } catch (e) {
-      console.error('failed to send over WebSocket', e);
+      //沢田つけたし
+      //console.error('failed to send over WebSocket', e);
+      console.error('❌ WebSocket送信エラー:', e);
+      setMessage(`撮影完了（WebSocket送信エラー: ${e})`);
+      //沢田つけたし
     }
 
     // バックエンド保存（既存の機能は維持）
@@ -158,10 +177,18 @@ export default function Page() {
       setUploading(true);
       const ct = blob.type || 'application/octet-stream';
       const result = await uploadSnapshot(blob, ct);
-      setMessage(`保存しました (picture_id=${result.picture_id})`);
+    //setMessage(`保存しました (picture_id=${result.picture_id})`);
+      //沢田つけたし
+      console.log('✅ バックエンド保存完了:', result);
+      setMessage(prev => prev ? `${prev} & バックエンド保存完了 (ID: ${result.picture_id})` : `バックエンド保存完了 (ID: ${result.picture_id})`);
+      //沢田つけたし
     } catch (e: any) {
-      console.error(e);
-      setMessage(e?.message ?? String(e));
+      //沢田つけたし
+      //console.error(e);
+      //setMessage(e?.message ?? String(e));
+      //沢田つけたし
+      console.error('❌ バックエンド保存エラー:', e);
+      setMessage(prev => prev ? `${prev} & バックエンド保存エラー: ${e?.message ?? String(e)}` : `バックエンド保存エラー: ${e?.message ?? String(e)}`);
     } finally {
       setUploading(false);
     }

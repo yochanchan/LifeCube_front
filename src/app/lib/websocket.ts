@@ -11,20 +11,6 @@ interface WebSocketMessage {
   senderId: string;
 }
 
-function buildWsBaseUrl(): string {
-  const explicit = process.env.NEXT_PUBLIC_WS_URL;
-  return `${explicit}/ws_test/ws`
-  const apiBase = process.env.NEXT_PUBLIC_API_ENDPOINT;
-  if (apiBase) {
-    try {
-      const u = new URL(apiBase);
-      const protocol = u.protocol === 'https:' ? 'wss:' : 'ws:';
-      return `${protocol}//${u.host}/ws_test/ws`;
-    } catch {}
-  }
-  return 'ws://localhost:8000/ws_test/ws';
-}
-
 export function useWebSocket(roomId: string, userId: string) {
   const [isConnected, setIsConnected] = useState(false);
   const [lastMessage, setLastMessage] = useState<WebSocketMessage | null>(null);
@@ -39,82 +25,188 @@ export function useWebSocket(roomId: string, userId: string) {
     }
   };
 
-  const scheduleReconnect = useCallback(() => {
-    cleanupTimer();
-    const attempt = Math.min(retryRef.current + 1, 6);
-    retryRef.current = attempt;
-    const delayMs = Math.floor(1000 * Math.pow(2, attempt - 1));
-    reconnectTimerRef.current = setTimeout(() => {
-      connect();
-    }, delayMs);
-  }, []);
-
   const connect = useCallback(() => {
     try {
-      const wsBase = buildWsBaseUrl();
-      const wsUrl = `${wsBase}/${roomId}`;
+      // 既存の接続があれば閉じる
+      if (wsRef.current) {
+        console.log('Closing existing WebSocket connection');
+        wsRef.current.close();
+        wsRef.current = null;
+      }
+
+      // 直接URLを構築（環境変数や複雑なロジックを使わない）
+      const wsUrl = `ws://localhost:8000/ws_test/ws/${roomId}`;
+      console.log('🔌 WebSocket接続試行:', {
+        roomId,
+        fullUrl: wsUrl
+      });
+      
       const ws = new WebSocket(wsUrl);
 
       ws.onopen = () => {
-        console.log('WebSocket connected:', wsUrl);
+        console.log('✅ WebSocket接続成功:', wsUrl);
+        console.log('✅ WebSocket状態:', ws.readyState);
+        console.log('✅ WebSocket URL:', ws.url);
+        console.log('✅ 接続時刻:', new Date().toISOString());
+        console.log('✅ ルームID:', roomId);
+        console.log('✅ ユーザーID:', userId);
         setIsConnected(true);
         retryRef.current = 0;
       };
 
       ws.onmessage = (event) => {
+        console.log('📨 WebSocket onmessage イベント受信開始');
+        console.log('📨 生データ:', event.data);
+        console.log('📨 データタイプ:', typeof event.data);
+        console.log('📨 データ長:', event.data?.length || 0);
+        console.log('📨 WebSocket状態:', ws.readyState);
+        console.log('📨 WebSocket URL:', ws.url);
+        
         try {
           const message: WebSocketMessage = JSON.parse(event.data);
+          console.log('📨 JSON解析成功:', {
+            type: message.type,
+            dataLength: message.data?.length || 0,
+            dataPrefix: message.data?.substring(0, 100) || '',
+            timestamp: message.timestamp,
+            senderId: message.senderId
+          });
+          
+          console.log('📨 setLastMessageを実行します');
+          console.log('📨 実行前のlastMessage:', lastMessage);
           setLastMessage(message);
+          console.log('📨 setLastMessage実行完了');
+          console.log('📨 実行後のlastMessage:', message);
+          
           if (message.type !== 'connection') {
-            console.log('Received message:', message.type);
+            console.log('📨 Received message:', message.type);
           }
         } catch (error) {
-          console.warn('Failed to parse WebSocket message:', error);
+          console.warn('❌ Failed to parse WebSocket message:', error);
+          console.warn('❌ 生データ:', event.data);
         }
+        
+        console.log('📨 WebSocket onmessage イベント処理完了');
       };
 
       ws.onclose = (ev) => {
-        console.warn('WebSocket disconnected', ev.code, ev.reason);
+        const closeInfo = {
+          code: ev.code,
+          reason: ev.reason || 'No reason provided',
+          wasClean: ev.wasClean,
+          type: ev.type || 'close'
+        };
+        
+        console.log('🔌 WebSocket切断:', closeInfo);
+        console.log('🔌 切断詳細:', {
+          code: ev.code,
+          reason: ev.reason,
+          wasClean: ev.wasClean,
+          type: ev.type,
+          targetReadyState: (ev.target as WebSocket)?.readyState
+        });
+        
         setIsConnected(false);
-        scheduleReconnect();
+        
+        // 正常終了（1000）、意図的な切断（1001）の場合は再接続しない
+        if (ev.code !== 1000 && ev.code !== 1001) {
+          console.log('🔄 異常切断のため再接続をスケジュール');
+          // 直接再接続ロジックを実行
+          setTimeout(() => {
+            if (retryRef.current < 5) {
+              retryRef.current++;
+              console.log(`🔄 再接続試行 ${retryRef.current}/5`);
+              connect();
+            }
+          }, 1000 * Math.pow(2, retryRef.current));
+        } else {
+          console.log('✅ 正常切断、再接続しません');
+        }
       };
 
-      ws.onerror = () => {
-        console.warn('WebSocket error event', { readyState: ws.readyState });
+      ws.onerror = (error) => {
+        const errorInfo = {
+          readyState: ws.readyState,
+          readyStateText: ['CONNECTING', 'OPEN', 'CLOSING', 'CLOSED'][ws.readyState],
+          error: error,
+          url: ws.url
+        };
+        
+        console.error('❌ WebSocketエラー:', errorInfo);
+        console.error('❌ エラー詳細:', {
+          readyState: ws.readyState,
+          readyStateText: ['CONNECTING', 'OPEN', 'CLOSING', 'CLOSED'][ws.readyState],
+          error: error,
+          url: ws.url,
+          bufferedAmount: ws.bufferedAmount
+        });
+        
         setIsConnected(false);
-        try { ws.close(); } catch {}
       };
 
       wsRef.current = ws;
     } catch (error) {
-      console.warn('Failed to connect WebSocket:', error);
+      console.error('❌ WebSocket接続作成エラー:', error);
       setIsConnected(false);
-      scheduleReconnect();
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [roomId, userId]);
+  }, [roomId]);
 
   const disconnect = useCallback(() => {
+    console.log('🔄 Manually disconnecting WebSocket');
     cleanupTimer();
+    
     if (wsRef.current) {
-      try { wsRef.current.close(); } catch {}
+      try { 
+        if (wsRef.current.readyState === WebSocket.OPEN) {
+          wsRef.current.close(1000, 'Manual disconnect'); 
+        }
+      } catch (error) {
+        console.warn('Error during manual disconnect:', error);
+      }
       wsRef.current = null;
     }
     setIsConnected(false);
+    retryRef.current = 0;
   }, []);
 
   const sendMessage = useCallback((message: Omit<WebSocketMessage, 'timestamp' | 'senderId'>) => {
-    if (wsRef.current && isConnected) {
+    console.log('📤 メッセージ送信開始:', {
+      type: message.type,
+      dataLength: message.data?.length || 0,
+      isConnected,
+      wsReadyState: wsRef.current?.readyState,
+      roomId,
+      userId
+    });
+
+    if (wsRef.current && isConnected && wsRef.current.readyState === WebSocket.OPEN) {
       const fullMessage: WebSocketMessage = {
         ...message,
         timestamp: Date.now(),
         senderId: userId
       };
-      wsRef.current.send(JSON.stringify(fullMessage));
+      try {
+        wsRef.current.send(JSON.stringify(fullMessage));
+        console.log('📤 Message sent successfully:', message.type);
+        console.log('📤 送信完了:', {
+          type: message.type,
+          dataLength: message.data?.length || 0,
+          timestamp: fullMessage.timestamp,
+          senderId: fullMessage.senderId
+        });
+      } catch (error) {
+        console.error('❌ Failed to send message:', error);
+      }
     } else {
-      console.warn('WebSocket is not connected');
+      console.warn('⚠️ WebSocket is not connected or ready');
+      console.warn('⚠️ 接続状態:', {
+        wsRefExists: !!wsRef.current,
+        isConnected,
+        wsReadyState: wsRef.current?.readyState,
+        wsReadyStateText: wsRef.current ? ['CONNECTING', 'OPEN', 'CLOSING', 'CLOSED'][wsRef.current.readyState] : 'NO_WS'
+      });
     }
-  }, [isConnected, userId]);
+  }, [isConnected, userId, roomId]);
 
   const sendPhoto = useCallback((imageData: string) => {
     sendMessage({ type: 'photo', data: imageData });
@@ -125,13 +217,15 @@ export function useWebSocket(roomId: string, userId: string) {
   }, [sendMessage]);
 
   useEffect(() => {
+    console.log('🚀 Initializing WebSocket connection');
     connect();
     return () => {
+      console.log('🧹 Cleaning up WebSocket connection');
       disconnect();
     };
-  }, [connect, disconnect]);
+  }, [roomId]); // roomIdが変更された時に再実行
 
   return { isConnected, lastMessage, sendPhoto, sendNotification, connect, disconnect };
 }
 
-//沢田つけたし
+// //沢田つけたし
