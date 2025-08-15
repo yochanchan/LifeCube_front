@@ -122,7 +122,7 @@ export default function Home() {
         {/*「はまさん」ページへのリンク*/}
         <section>
           <h2 className="text-xl font-bold mb-4">はまさんの宿題ページは以下です（音声認識は下の方に追加）</h2>
-          <Link href="/test_hama"> {/* /test_hama へ遷移 */}
+          <Link href="/mic_camera"> {/* /test_hama へ遷移 */}
             <button
               className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded"
             >
@@ -190,16 +190,16 @@ export default function Home() {
           {/*沢田つけたし*/}
           <Link href="/album">
             <button
-              className="bg-grey-500 hover:bg-red-600 text-white px-4 py-2 rounded"
+              className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded"
             >
-              album（使わない）
+              album
             </button>
           </Link>
           <Link href="/login">
             <button
               className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded"
             >
-              ログイン→アルバム
+              ログイン（アルバム、カメラ用）
             </button>
           </Link>
         </section>

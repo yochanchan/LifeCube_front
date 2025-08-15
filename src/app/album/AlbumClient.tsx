@@ -1,8 +1,10 @@
-// app/album/AlbumClient.tsx
+// src/app/album/AlbumClient.tsx
 "use client";
 
 import React, { useEffect, useState } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
 import useSWR, { useSWRConfig } from "swr";
+import Link from "next/link";
 
 /* ───────────────────────────────────────────────────────────
    定数・ユーティリティ
@@ -12,23 +14,8 @@ import useSWR, { useSWRConfig } from "swr";
 const API_BASE_RAW = process.env.NEXT_PUBLIC_API_ENDPOINT;
 const API_BASE = (API_BASE_RAW ?? "").replace(/\/+$/, "");
 
-/** サムネイル幅のデフォルト値（マジックナンバー解消） */
+/** サムネイル幅のデフォルト値 */
 const DEFAULT_THUMB_W = 256;
-
-/**
- * PoC 用 account_id 取得方針
- * - 1) localStorage の値を優先
- * - 2) なければ .env の NEXT_PUBLIC_ACCOUNT_ID
- * - 3) どちらも無ければ null（＝全件モードで API を叩く）
- */
-function getAccountId(): string | null {
-  if (typeof window !== "undefined") {
-    const fromLS = window.localStorage.getItem("account_id");
-    if (fromLS) return fromLS;
-  }
-  const fromEnv = process.env.NEXT_PUBLIC_ACCOUNT_ID;
-  return fromEnv ?? null;
-}
 
 /** YYYY-MM-DD → 「YYYY年M月D日」 */
 function formatJP(dateStr: string): string {
@@ -51,7 +38,6 @@ const fetcher = <T,>(url: string) =>
    型
    ─────────────────────────────────────────────────────────── */
 
-/** バックエンドが返す 1枚の写真メタ情報 */
 export type PictureMeta = {
   picture_id: number;
   account_id: number;
@@ -71,32 +57,24 @@ export type PictureMeta = {
 };
 
 /* ───────────────────────────────────────────────────────────
-   エンドポイント（他ファイルとの接続は変更しない）
+   エンドポイント
    ─────────────────────────────────────────────────────────── */
 
 const endpoints = {
-  dates: (accountId?: string | null, tripId?: string | null) => {
+  dates: (tripId?: string | null) => {
     const params = new URLSearchParams();
-    if (accountId) params.set("account_id", accountId);
     if (tripId) params.set("trip_id", tripId);
     const q = params.toString();
     return `${API_BASE}/api/pictures/dates${q ? `?${q}` : ""}`;
   },
-  byDate: (
-    date: string,
-    accountId?: string | null,
-    tripId?: string | null,
-    thumbW: number = DEFAULT_THUMB_W
-  ) => {
+  byDate: (date: string, tripId?: string | null, thumbW: number = DEFAULT_THUMB_W) => {
     const params = new URLSearchParams({ date, thumb_w: String(thumbW) });
-    if (accountId) params.set("account_id", accountId);
     if (tripId) params.set("trip_id", tripId);
     return `${API_BASE}/api/pictures/by-date?${params.toString()}`;
   },
   image: (id: number) => `${API_BASE}/api/pictures/${id}/image`,
   thumb: (id: number, w: number = DEFAULT_THUMB_W) =>
     `${API_BASE}/api/pictures/${id}/thumbnail?w=${w}`,
-  /** 削除API */
   deletePicture: (id: number) => `${API_BASE}/api/pictures/${id}`,
 };
 
@@ -105,35 +83,57 @@ const endpoints = {
    ─────────────────────────────────────────────────────────── */
 
 export default function AlbumClient({
-  tripId,
   initial,
 }: {
-  tripId: string | null;
   initial: {
-    accountId: string | null;
     dates?: string[];
     selectedDate: string | null;
     pictures?: PictureMeta[];
   };
 }) {
-  /** account_id はクライアントで最終決定（LS 優先） */
-  const [accountId, setAccountId] = useState<string | null>(initial.accountId ?? null);
-  useEffect(() => {
-    const v = getAccountId();
-    if (v !== accountId) setAccountId(v);
-    // 初回のみチェック（StrictMode でも安全）
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  const router = useRouter();
 
-  /** 日付一覧（SWR） */
-  const datesKey = endpoints.dates(accountId, tripId);
+  // 認証チェック：未ログインなら /login へ（Hooks は常にトップレベルで宣言）
+  const [me, setMe] = useState<{ account_id: number; email: string; role: string } | null>(null);
+  const [authChecked, setAuthChecked] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`${API_BASE}/auth/me`, {
+          credentials: "include",
+          cache: "no-store",
+        });
+        if (!res.ok) throw new Error("unauth");
+        const j = await res.json();
+        if (!cancelled) setMe(j);
+      } catch {
+        if (!cancelled) router.replace(`/login?next=/album`);
+      } finally {
+        if (!cancelled) setAuthChecked(true);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [router]);
+
+  const authReady = authChecked && !!me;
+
+  // CSRでクエリを読む
+  const searchParams = useSearchParams();
+  const tripId = searchParams.get("trip_id"); // string | null
+
+  /** 日付一覧（SWR）— 認証前は key を null にして発火させない */
+  const datesKey = authReady ? endpoints.dates(tripId) : null;
   const {
     data: dates = initial.dates,
     error: errorDates,
     isLoading: loadingDates,
   } = useSWR<string[]>(datesKey, fetcher, { fallbackData: initial.dates });
 
-  /** 選択日付（SSR で未決定なら最新日を自動選択） */
+  /** 選択日付（未決定なら最新日を自動選択） */
   const [selectedDate, setSelectedDate] = useState<string | null>(initial.selectedDate);
   useEffect(() => {
     if (!selectedDate && dates && dates.length > 0) {
@@ -141,10 +141,9 @@ export default function AlbumClient({
     }
   }, [dates, selectedDate]);
 
-  /** 写真一覧（選択日付が決まっている場合のみ） */
-  const picsKey = selectedDate
-    ? endpoints.byDate(selectedDate, accountId, tripId, DEFAULT_THUMB_W)
-    : null;
+  /** 写真一覧（選択日付が決まっており、かつ認証OKのときのみ） */
+  const picsKey =
+    authReady && selectedDate ? endpoints.byDate(selectedDate, tripId, DEFAULT_THUMB_W) : null;
   const {
     data: pictures = initial.pictures,
     error: errorPics,
@@ -153,33 +152,40 @@ export default function AlbumClient({
 
   return (
     <main className="min-h-screen bg-gradient-to-b from-rose-50 via-pink-50 to-purple-50">
-      <div className="mx-auto max-w-6xl px-4 py-8">
-        <HeaderCute />
+      {!authReady ? (
+        <div className="min-h-[40vh] grid place-items-center">
+          <div className="rounded-xl bg-white/80 p-4 ring-1 ring-rose-100 text-rose-700">
+            認証確認中…
+          </div>
+        </div>
+      ) : (
+        <div className="mx-auto max-w-6xl px-4 py-8">
+          <HeaderCute />
 
-        {/* 日付セレクタ */}
-        <section className="mt-6">
-          <h2 className="text-lg font-semibold text-rose-700">アルバム日付</h2>
-          <DateChips
-            dates={dates ?? []}
-            loading={!!loadingDates}
-            error={errorDates ? (errorDates as Error).message : null}
-            selected={selectedDate}
-            onSelect={setSelectedDate}
-          />
-        </section>
+          {/* 日付セレクタ */}
+          <section className="mt-6">
+            <h2 className="text-lg font-semibold text-rose-700">アルバム日付</h2>
+            <DateChips
+              dates={dates ?? []}
+              loading={!!loadingDates}
+              error={errorDates ? (errorDates as Error).message : null}
+              selected={selectedDate}
+              onSelect={setSelectedDate}
+            />
+          </section>
 
-        {/* 写真グリッド（削除ボタン付き） */}
-        <section className="mt-6">
-          <h2 className="sr-only">写真一覧</h2>
-          <PicturesGrid
-            items={pictures ?? []}
-            loading={!!loadingPics}
-            error={errorPics ? (errorPics as Error).message : null}
-            /** SWR のキーを渡して、削除後にキャッシュを更新（楽観的更新） */
-            swrKey={picsKey}
-          />
-        </section>
-      </div>
+          {/* 写真グリッド（削除ボタン付き） */}
+          <section className="mt-6">
+            <h2 className="sr-only">写真一覧</h2>
+            <PicturesGrid
+              items={pictures ?? []}
+              loading={!!loadingPics}
+              error={errorPics ? (errorPics as Error).message : null}
+              swrKey={picsKey}
+            />
+          </section>
+        </div>
+      )}
     </main>
   );
 }
@@ -188,7 +194,6 @@ export default function AlbumClient({
    プレゼンテーション系コンポーネント
    ─────────────────────────────────────────────────────────── */
 
-/** 画面ヘッダ */
 function HeaderCute() {
   return (
     <header className="flex items-center gap-3 rounded-2xl bg-white/70 p-4 shadow-sm ring-1 ring-rose-100">
@@ -199,11 +204,17 @@ function HeaderCute() {
         <h1 className="text-2xl font-extrabold tracking-tight text-rose-800">アルバム</h1>
         <p className="text-sm text-rose-500">JST基準で日付ごとの写真を表示します</p>
       </div>
+      <Link
+        href="/"
+        className="ml-auto inline-flex items-center gap-2 rounded-full bg-rose-500 px-4 py-2 text-white hover:bg-rose-600 focus:outline-none focus:ring-2 focus:ring-rose-300"
+        aria-label="トップページへ"
+      >
+        <span>トップへ</span>
+      </Link>
     </header>
   );
 }
 
-/** 日付チップ群（ローディング／エラー／空を内包） */
 function DateChips({
   dates,
   loading,
@@ -218,12 +229,8 @@ function DateChips({
   onSelect: (d: string) => void;
 }) {
   if (loading) return <SkeletonChips />;
-
-  if (error)
-    return <ErrorBanner text={`エラー: ${error}`} />;
-
-  if (!dates || dates.length === 0)
-    return <EmptyBanner text="まだ写真がありません。" />;
+  if (error) return <ErrorBanner text={`エラー: ${error}`} />;
+  if (!dates || dates.length === 0) return <EmptyBanner text="まだ写真がありません。" />;
 
   return (
     <div className="mt-3 flex gap-2 overflow-x-auto pb-2">
@@ -250,7 +257,6 @@ function DateChips({
   );
 }
 
-/** 写真グリッド（削除ボタン付き） */
 function PicturesGrid({
   items,
   loading,
@@ -260,16 +266,14 @@ function PicturesGrid({
   items: PictureMeta[];
   loading: boolean;
   error: string | null;
-  /** この一覧に対応する SWR キー（mutate で楽観的更新に使用） */
   swrKey: string | null;
 }) {
   const { mutate } = useSWRConfig();
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [opError, setOpError] = useState<string | null>(null);
 
-  /** 削除処理（API 呼び出し → 楽観的に一覧更新） */
   const doDelete = async (id: number) => {
-    if (!swrKey) return; // 一覧キーが無いときは何もしない
+    if (!swrKey) return;
     setOpError(null);
 
     const ok = window.confirm("この写真を削除しますか？（元に戻せません）");
@@ -277,13 +281,15 @@ function PicturesGrid({
 
     setDeletingId(id);
     try {
-      const res = await fetch(endpoints.deletePicture(id), { method: "DELETE" });
+      const res = await fetch(endpoints.deletePicture(id), {
+        method: "DELETE",
+        credentials: "include",
+      });
       if (!res.ok && res.status !== 204) {
         const text = await res.text().catch(() => "");
         throw new Error(`削除に失敗しました: ${res.status} ${res.statusText} ${text}`);
       }
 
-      // 楽観的更新：対象IDを一覧から除外（再フェッチはしない）
       await mutate(
         swrKey,
         (prev: PictureMeta[] | undefined) => prev?.filter((x) => x.picture_id !== id),
@@ -297,18 +303,14 @@ function PicturesGrid({
   };
 
   if (loading) return <SkeletonGrid />;
-
   if (error) return <ErrorBanner text={`エラー: ${error}`} />;
-
-  if (!items || items.length === 0)
-    return <EmptyBanner text="この日には写真がありません。" />;
+  if (!items || items.length === 0) return <EmptyBanner text="この日には写真がありません。" />;
 
   return (
     <>
       {opError && <ErrorBanner text={`エラー: ${opError}`} />}
       <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
         {items.map((p) => {
-          // API_BASE + thumbnail_path を安全に結合（先頭スラッシュ有無で // にならないように）
           const thumbSrc = p.thumbnail_path
             ? `${API_BASE}${p.thumbnail_path.startsWith("/") ? "" : "/"}${p.thumbnail_path}`
             : endpoints.thumb(p.picture_id, DEFAULT_THUMB_W);
@@ -320,13 +322,13 @@ function PicturesGrid({
               key={p.picture_id}
               className="group relative overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-rose-100"
             >
-              {/* 画像クリックでフル画像を新規タブ表示 */}
               <a
                 href={endpoints.image(p.picture_id)}
                 target="_blank"
                 rel="noreferrer noopener"
                 className="block"
               >
+                {/* Lint の警告が出る場合は next/image への置き換えを検討 */}
                 <img
                   src={thumbSrc}
                   alt={p.user_comment ?? p.situation_for_quiz ?? p.pictured_at}
@@ -339,7 +341,6 @@ function PicturesGrid({
                 />
               </a>
 
-              {/* 右上の削除ボタン（クリックはリンクに伝播させない） */}
               <button
                 type="button"
                 aria-label="削除"
@@ -375,7 +376,7 @@ function PicturesGrid({
 }
 
 /* ───────────────────────────────────────────────────────────
-   UI 小コンポーネント（読みやすさ向上のための切り出し）
+   UI 小コンポーネント
    ─────────────────────────────────────────────────────────── */
 
 function SkeletonChips() {
