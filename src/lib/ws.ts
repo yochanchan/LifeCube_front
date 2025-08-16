@@ -1,6 +1,7 @@
 // src/lib/ws.ts
 export type WsMessage =
   | { type: "take_photo"; origin_device_id: string; ts?: number }
+  | { type: "photo_uploaded"; seq: number; picture_id: number; device_id: string; image_url: string; pictured_at?: string }
   | { type: "ping" }
   | { type: "pong" }
   | { type: string;[k: string]: any };
