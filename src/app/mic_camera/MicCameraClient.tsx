@@ -12,9 +12,6 @@ const API_BASE = (process.env.NEXT_PUBLIC_API_ENDPOINT ?? "").replace(/\/+$/, ""
 const WS_BASE = process.env.NEXT_PUBLIC_WS_URL ?? "";
 const DEFAULT_REGION = process.env.NEXT_PUBLIC_AZURE_SPEECH_REGION ?? "japaneast";
 
-// HB間隔（秒）
-const HEARTBEAT_SEC = 7;
-
 function getOrCreateDeviceId(): string {
   try {
     const KEY = "device_uid";
@@ -38,10 +35,8 @@ type PhotoItem = {
   pictured_at?: string;
 };
 
-// Join エラー文言
-function humanJoinError(
-  reason: "invalid_role" | "recorder_full" | "shooter_full" | "not_connected" | "timeout"
-): string {
+// Join エラー文言の整形
+function humanJoinError(reason: "invalid_role" | "recorder_full" | "shooter_full" | "not_connected" | "timeout"): string {
   switch (reason) {
     case "invalid_role":
       return "無効なロールです。";
@@ -68,16 +63,7 @@ export default function MicCameraClient() {
 
   // 画面状態
   const [status, setStatus] = useState("初期化中…");
-  const [recActive, setRecActive] = useState(false);       // ユーザのON/OFF意図
-  const [leaseGranted, setLeaseGranted] = useState(false); // サーバのリース保持状態
-  const heartbeatTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  // 通知バナー
-  const [banner, setBanner] = useState<string | null>(null);
-  const showBanner = (msg: string, ms = 4000) => {
-    setBanner(msg);
-    setTimeout(() => setBanner(null), ms);
-  };
+  const [recActive, setRecActive] = useState(false);
 
   // 文字起こし
   const [liveText, setLiveText] = useState<string>("");
@@ -133,7 +119,6 @@ export default function MicCameraClient() {
       if (msg?.type === "take_photo" && (msg as any).origin_device_id !== myDeviceId) {
         window.dispatchEvent(new Event("mic-camera:take_photo"));
       }
-
       // 2) photo_uploaded → 最新プレビュー候補を更新
       if (msg?.type === "photo_uploaded") {
         const m = msg as Extract<WsMessage, { type: "photo_uploaded" }>;
@@ -156,33 +141,6 @@ export default function MicCameraClient() {
           const pickFrom = (others.length > 0 ? others : values).sort((a, b) => b.seq - a.seq);
           setPreview(pickFrom[0] ?? null);
         }, DEBOUNCE_MS);
-      }
-
-      // 3) recorder lease イベント
-      if (msg?.type === "recorder_granted") {
-        setLeaseGranted(true);
-        setStatus("録音リース付与");
-        // HB開始（7秒）
-        if (heartbeatTimerRef.current) clearInterval(heartbeatTimerRef.current);
-        heartbeatTimerRef.current = setInterval(() => {
-          sendJson({ type: "recorder_heartbeat" });
-        }, HEARTBEAT_SEC * 1000);
-      }
-      if (msg?.type === "recorder_denied") {
-        setLeaseGranted(false);
-        setRecActive(false);
-        showBanner("他端末が録音を保持中のため取得できませんでした。", 4500);
-        setStatus("recorder_denied");
-      }
-      if (msg?.type === "recorder_revoked") {
-        setLeaseGranted(false);
-        setRecActive(false);
-        if (heartbeatTimerRef.current) {
-          clearInterval(heartbeatTimerRef.current);
-          heartbeatTimerRef.current = null;
-        }
-        showBanner("録音リースが剥奪されました（expired/他端末優先/切断）", 6000);
-        setStatus(`recorder_revoked: ${String((msg as any).reason)}`);
       }
     },
   });
@@ -212,48 +170,13 @@ export default function MicCameraClient() {
     };
   }, [authReady, room, readyState, joinedRole, join]);
 
-  // 録音ON/OFFの度に acquire/release を送る
-  useEffect(() => {
-    if (!joinedRole || joinedRole !== "recorder") return;
-    if (readyState !== WebSocket.OPEN) return;
-
-    // ON → acquire 要求（応答で leaseGranted を更新）
-    if (recActive) {
-      sendJson({ type: "recorder_acquire" });
-    } else {
-      // OFF → release
-      if (leaseGranted) {
-        sendJson({ type: "recorder_release" });
-      }
-      if (heartbeatTimerRef.current) {
-        clearInterval(heartbeatTimerRef.current);
-        heartbeatTimerRef.current = null;
-      }
-      setLeaseGranted(false);
-    }
-    // クリーンアップは別の useEffect（アンマウント）で
-  }, [recActive, joinedRole, readyState, leaseGranted, sendJson]);
-
-  // アンマウント時に release
-  useEffect(() => {
-    return () => {
-      try {
-        if (leaseGranted) sendJson({ type: "recorder_release" });
-      } catch { /* noop */ }
-      if (heartbeatTimerRef.current) clearInterval(heartbeatTimerRef.current);
-      if (triggerTimerRef.current) clearTimeout(triggerTimerRef.current);
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
   // 撮影トリガ
   const broadcastTakePhoto = useCallback(() => {
     window.dispatchEvent(new Event("mic-camera:take_photo"));
     sendJson({ type: "take_photo", origin_device_id: myDeviceId, ts: Date.now() });
   }, [sendJson, myDeviceId]);
 
-  // 文字起こしハンドラ（リース保持中のみ有効にする）
+  // 文字起こしハンドラ
   const handleTranscript = useCallback((p: { text: string; isFinal: boolean; ts: number }) => {
     if (p.isFinal) {
       setLiveText("");
@@ -265,15 +188,21 @@ export default function MicCameraClient() {
 
   const handleTrigger = useCallback(
     (p: { keyword: string; source: "interim" | "final"; text: string; ts: number }) => {
-      // リース付与中のみ撮影トリガ
-      if (!(recActive && leaseGranted)) return;
       broadcastTakePhoto();
       setTriggerMsg(`キーワード：「${p.keyword}」により撮影されました`);
       if (triggerTimerRef.current) clearTimeout(triggerTimerRef.current);
       triggerTimerRef.current = setTimeout(() => setTriggerMsg(null), 4000);
     },
-    [broadcastTakePhoto, recActive, leaseGranted]
+    [broadcastTakePhoto]
   );
+
+  // タイマー類のクリーンアップ
+  useEffect(() => {
+    return () => {
+      if (triggerTimerRef.current) clearTimeout(triggerTimerRef.current);
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, []);
 
   // プレビュー画像URL（フル画像）
   const imageSrc = preview
@@ -321,17 +250,14 @@ export default function MicCameraClient() {
               </span>
             </div>
 
-            {/* roster ミニ表示 */}
+            {/* roster ミニ表示（任意） */}
             {roster && (
               <div className="mt-2 text-xs text-rose-600">
-                RECORDER {roster.counts.recorder}/1{roster.recorder ? `（保持者: ${roster.recorder}）` : ""}, SHOOTER {roster.counts.shooter}/4
+                RECORDER {roster.counts.recorder}/1, SHOOTER {roster.counts.shooter}/4
               </div>
             )}
           </header>
 
-          {banner && (
-            <div className="rounded-xl bg-amber-50 p-3 text-amber-800 ring-1 ring-amber-100">{banner}</div>
-          )}
           {triggerMsg && (
             <div className="rounded-xl bg-emerald-50 p-3 text-emerald-800 ring-1 ring-emerald-100">{triggerMsg}</div>
           )}
@@ -341,13 +267,11 @@ export default function MicCameraClient() {
             <CameraPreview apiBase={API_BASE} wsRef={wsRef} myDeviceId={myDeviceId} sendJson={sendJson} />
           </section>
 
-          {/* 中：文字起こし（リース付与中のみ動作） */}
+          {/* 中：文字起こし */}
           <section aria-label="文字起こし" className="rounded-2xl bg-white/80 p-3 shadow-sm ring-1 ring-rose-100">
-            <h2 className="text-sm font-semibold text-rose-700">
-              文字起こし（{leaseGranted && recActive ? "動作中" : "待機中"}）
-            </h2>
+            <h2 className="text-sm font-semibold text-rose-700">文字起こし（リアルタイム）</h2>
             <div className="mt-2 min-h-[44px] rounded-lg bg-rose-50 px-3 py-2 text-rose-800">
-              {leaseGranted && recActive ? (liveText || <span className="text-rose-400">（発話待機中）</span>) : <span className="text-rose-400">（録音OFF/未付与）</span>}
+              {liveText ? liveText : <span className="text-rose-400">（発話待機中）</span>}
             </div>
             <div className="mt-3 max-h-60 overflow-y-auto rounded-lg bg-white ring-1 ring-rose-100">
               {finalLines.length === 0 ? (
@@ -390,7 +314,7 @@ export default function MicCameraClient() {
           <SpeechController
             apiBase={API_BASE}
             defaultRegion={DEFAULT_REGION}
-            active={recActive && leaseGranted}
+            active={recActive}
             onTranscript={handleTranscript}
             onTrigger={handleTrigger}
             onStatusChange={(s, d) => console.log("[Speech]", s, d ?? "")}
