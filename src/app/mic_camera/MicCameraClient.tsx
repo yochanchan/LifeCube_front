@@ -114,6 +114,7 @@ export default function MicCameraClient() {
     base: WS_BASE,
     room,
     deviceId: myDeviceId,
+    pingIntervalMs: 5000, // ← 5秒
     onMessage: (msg: WsMessage) => {
       // 1) take_photo → ローカルイベントで撮影
       if (msg?.type === "take_photo" && (msg as any).origin_device_id !== myDeviceId) {
