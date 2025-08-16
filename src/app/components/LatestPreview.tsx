@@ -26,24 +26,26 @@ function toAbsUrl(apiBase: string, url: string): string {
   return url.startsWith("/") ? `${apiBase}${url}` : url;
 }
 
+type LatestPreviewProps = {
+  apiBase: string;
+  /** RefObject でも MutableRefObject でもOKな構造的型 */
+  wsRef: { current: WebSocket | null };
+  policy: Policy;
+  myDeviceId: string;
+  debounceMs?: number;
+};
+
 export default function LatestPreview({
   apiBase,
   wsRef,
   policy,
   myDeviceId,
   debounceMs = 1200,
-}: {
-  apiBase: string;
-  wsRef: React.MutableRefObject<WebSocket | null>;
-  policy: Policy;
-  myDeviceId: string;
-  debounceMs?: number;
-}) {
+}: LatestPreviewProps) {
   const latestMapRef = useRef<Map<string, PhotoItem>>(new Map());
   const [preview, setPreview] = useState<PhotoItem | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // WS 受信
   useEffect(() => {
     const ws = wsRef.current;
     if (!ws) return;
@@ -74,12 +76,12 @@ export default function LatestPreview({
             return;
           }
           if (policy === "recorder") {
-            // 自分以外を優先、なければ全体から seq 最大
+            // 自分以外を優先。なければ全体の最大 seq
             const others = values.filter((v) => v.device_id !== myDeviceId);
             const pickFrom = (others.length > 0 ? others : values).sort((a, b) => b.seq - a.seq);
             setPreview(pickFrom[0] ?? null);
           } else {
-            // policy === "shooter" → 自分の最大 seq
+            // shooter: 自分の最大 seq
             const mine = values.filter((v) => v.device_id === myDeviceId).sort((a, b) => b.seq - a.seq);
             setPreview(mine[0] ?? null);
           }
@@ -101,24 +103,25 @@ export default function LatestPreview({
     [apiBase, preview]
   );
 
-  if (!preview) {
-    return <div className="mt-2 rounded-lg bg-rose-50 p-3 text-rose-400">（まだ写真がありません）</div>;
-  }
-
   return (
-    <figure className="mt-2 overflow-hidden rounded-xl bg-white ring-1 ring-rose-100">
-      {/* Lint の警告が出る場合は next/image への置き換えを検討 */}
-      <img
-        src={imageSrc!}
-        alt={preview.pictured_at ?? `seq=${preview.seq}`}
-        className="block max-h-96 w-full bg-black/5 object-contain"
-        loading="eager"
-        decoding="async"
-      />
-      <figcaption className="flex items-center justify-between px-3 py-2 text-xs text-rose-700">
-        <span className="truncate">seq: {preview.seq}</span>
-        <span className="rounded bg-rose-50 px-2 py-0.5">{preview.device_id}</span>
-      </figcaption>
-    </figure>
+    <section className="rounded-2xl bg-white p-2 shadow-sm ring-1 ring-rose-100">
+      {!preview ? (
+        <div className="mt-2 rounded-lg bg-rose-50 p-3 text-rose-400">（まだ写真がありません）</div>
+      ) : (
+        <figure className="mt-2 overflow-hidden rounded-xl bg-white ring-1 ring-rose-100">
+          <img
+            src={imageSrc!}
+            alt={preview.pictured_at ?? `seq=${preview.seq}`}
+            className="block max-h-96 w-full bg-black/5 object-contain"
+            loading="eager"
+            decoding="async"
+          />
+          <figcaption className="flex items-center justify-between px-3 py-2 text-xs text-rose-700">
+            <span className="truncate">seq: {preview.seq}</span>
+            <span className="rounded bg-rose-50 px-2 py-0.5">{preview.device_id}</span>
+          </figcaption>
+        </figure>
+      )}
+    </section>
   );
 }
