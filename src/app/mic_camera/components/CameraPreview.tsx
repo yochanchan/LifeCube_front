@@ -2,14 +2,25 @@
 "use client";
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
+import { safeSend } from "../../../lib/ws";
 
 type Props = {
   apiBase: string;
   wsRef: React.MutableRefObject<WebSocket | null>;
   myDeviceId: string;
+  /** あればこちらを優先して送信。無ければ safeSend(wsRef.current, ...) にフォールバック */
+  sendJson?: (msg: unknown) => boolean | void;
 };
 
-export default function CameraPreview({ apiBase, wsRef, myDeviceId }: Props) {
+type UploadResp = {
+  picture_id: number;
+  thumbnail_path: string;
+  image_path?: string | null;     // ★ 追加：フル画像URL（相対）
+  pictured_at?: string | null;
+  device_id?: string | null;
+};
+
+export default function CameraPreview({ apiBase, wsRef, myDeviceId, sendJson }: Props) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -49,6 +60,22 @@ export default function CameraPreview({ apiBase, wsRef, myDeviceId }: Props) {
     };
   }, []);
 
+  // WS 送信用の小ヘルパ
+  const sendWs = useCallback(
+    (payload: unknown) => {
+      if (typeof sendJson === "function") {
+        try {
+          const r = sendJson(payload);
+          return typeof r === "boolean" ? r : true;
+        } catch {
+          // フォールバック
+        }
+      }
+      return safeSend(wsRef.current, payload);
+    },
+    [sendJson, wsRef]
+  );
+
   // 撮影 & アップロード
   const snapAndUpload = useCallback(async () => {
     if (busy) return;
@@ -71,11 +98,7 @@ export default function CameraPreview({ apiBase, wsRef, myDeviceId }: Props) {
       ctx.drawImage(video, 0, 0, w, h);
 
       const blob: Blob = await new Promise((resolve, reject) => {
-        canvas.toBlob(
-          (b) => (b ? resolve(b) : reject(new Error("toBlob 失敗"))),
-          "image/jpeg",
-          0.92
-        );
+        canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("toBlob 失敗"))), "image/jpeg", 0.92);
       });
 
       const fd = new FormData();
@@ -94,6 +117,21 @@ export default function CameraPreview({ apiBase, wsRef, myDeviceId }: Props) {
         throw new Error(`アップロード失敗: ${res.status} ${res.statusText} ${text}`);
       }
 
+      const j = (await res.json()) as UploadResp;
+
+      // ✅ フル画像URL（相対）を優先。無ければ保険で自前組み立て。
+      const imagePath = j.image_path ?? `/api/pictures/${j.picture_id}/image`;
+
+      // ✅ フェーズ0要件：アップロード直後に WS で photo_uploaded を送る（フル画像を指す image_url）
+      const payload = {
+        type: "photo_uploaded",
+        picture_id: j.picture_id,
+        device_id: myDeviceId,
+        image_url: imagePath, // 例: "/api/pictures/123/image"
+        pictured_at: j.pictured_at ?? new Date().toISOString(),
+      };
+      sendWs(payload);
+
       setMsg("アップロードしました");
       setTimeout(() => setMsg(null), 2000);
     } catch (e: any) {
@@ -101,7 +139,7 @@ export default function CameraPreview({ apiBase, wsRef, myDeviceId }: Props) {
     } finally {
       setBusy(false);
     }
-  }, [apiBase, myDeviceId, busy]);
+  }, [apiBase, myDeviceId, busy, sendWs]);
 
   // ローカルイベント → 撮影
   useEffect(() => {
@@ -137,13 +175,7 @@ export default function CameraPreview({ apiBase, wsRef, myDeviceId }: Props) {
   return (
     <div className="space-y-2">
       <div className="overflow-hidden rounded-2xl bg-black shadow ring-1 ring-rose-200">
-        <video
-          ref={videoRef}
-          playsInline
-          muted
-          autoPlay
-          className="aspect-video w-full object-cover"
-        />
+        <video ref={videoRef} playsInline muted autoPlay className="aspect-video w-full object-cover" />
       </div>
 
       <div className="flex items-center gap-2">
