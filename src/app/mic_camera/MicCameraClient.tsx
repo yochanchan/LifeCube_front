@@ -4,13 +4,15 @@
 import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import CameraPreview from "./components/CameraPreview";
-import SpeechController from "./components/SpeechController";
+import SpeechController from "./components/SpeechController"; // ★ 重要：録音エンジン
 import { useRoomSocket } from "../../hooks/useRoomSocket";
+import type { WsMessage } from "../../lib/ws";
 
 const API_BASE = (process.env.NEXT_PUBLIC_API_ENDPOINT ?? "").replace(/\/+$/, "");
 const WS_BASE = process.env.NEXT_PUBLIC_WS_URL ?? "";
 const DEFAULT_REGION = process.env.NEXT_PUBLIC_AZURE_SPEECH_REGION ?? "japaneast";
 
+// 現行 MicCamera は RECORDER 用の画面として扱う（フェーズ4で分離予定）
 function getOrCreateDeviceId(): string {
   try {
     const KEY = "device_uid";
@@ -27,6 +29,13 @@ function getOrCreateDeviceId(): string {
 
 type Me = { account_id: number; email: string; role: string };
 
+type PhotoItem = {
+  seq: number;
+  device_id: string;
+  image_url: string;
+  pictured_at?: string;
+};
+
 export default function MicCameraClient() {
   const router = useRouter();
 
@@ -41,6 +50,12 @@ export default function MicCameraClient() {
   const [finalLines, setFinalLines] = useState<{ text: string; ts: number }[]>([]);
   const [triggerMsg, setTriggerMsg] = useState<string | null>(null);
   const triggerTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // 最新プレビュー（RECORDERポリシー：自分以外の最大 seq）
+  const latestMapRef = useRef<Map<string, PhotoItem>>(new Map());
+  const [preview, setPreview] = useState<PhotoItem | null>(null);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const DEBOUNCE_MS = 1200;
 
   const myDeviceId = useMemo(getOrCreateDeviceId, []);
   const room = me ? `acc:${me.account_id}` : null;
@@ -75,14 +90,39 @@ export default function MicCameraClient() {
     };
   }, [router]);
 
-  // ★ WS 接続（/ws）。message→ローカルイベントへ
+  // WS 接続
   const { wsRef, readyState, sendJson } = useRoomSocket({
     base: WS_BASE,
     room,
     deviceId: myDeviceId,
-    onMessage: (msg) => {
+    onMessage: (msg: WsMessage) => {
+      // 1) take_photo → 既存どおりローカルイベントで撮影
       if (msg?.type === "take_photo" && (msg as any).origin_device_id !== myDeviceId) {
         window.dispatchEvent(new Event("mic-camera:take_photo"));
+      }
+      // 2) photo_uploaded → 最新プレビュー候補を更新
+      if (msg?.type === "photo_uploaded") {
+        const m = msg as Extract<WsMessage, { type: "photo_uploaded" }>;
+        const item: PhotoItem = {
+          seq: m.seq,
+          device_id: m.device_id,
+          image_url: m.image_url,
+          pictured_at: m.pictured_at,
+        };
+        const map = latestMapRef.current;
+        const prev = map.get(item.device_id);
+        if (!prev || item.seq > prev.seq) {
+          map.set(item.device_id, item);
+        }
+        // デバウンスして描画候補を更新
+        if (debounceRef.current) clearTimeout(debounceRef.current);
+        debounceRef.current = setTimeout(() => {
+          const values = Array.from(map.values());
+          // 自分以外の最大 seq を優先
+          const others = values.filter((v) => v.device_id !== myDeviceId);
+          const pickFrom = (others.length > 0 ? others : values).sort((a, b) => b.seq - a.seq);
+          setPreview(pickFrom[0] ?? null);
+        }, DEBOUNCE_MS);
       }
     },
   });
@@ -116,8 +156,16 @@ export default function MicCameraClient() {
   useEffect(() => {
     return () => {
       if (triggerTimerRef.current) clearTimeout(triggerTimerRef.current);
+      if (debounceRef.current) clearTimeout(debounceRef.current);
     };
   }, []);
+
+  // 画像URLを絶対化（相対なら API_BASE を前置）
+  const imageSrc = preview
+    ? preview.image_url.startsWith("/")
+      ? `${API_BASE}${preview.image_url}`
+      : preview.image_url
+    : null;
 
   return (
     <main className="min-h-screen bg-gradient-to-b from-rose-50 via-pink-50 to-purple-50">
@@ -131,7 +179,7 @@ export default function MicCameraClient() {
         <div className="mx-auto max-w-md p-4 space-y-4 sm:max-w-lg">
           <header className="rounded-2xl bg-white/70 p-4 shadow-sm ring-1 ring-rose-100">
             <div className="flex flex-wrap items-center gap-2">
-              <h1 className="text-xl font-bold text-rose-800">Mic &amp; Camera</h1>
+              <h1 className="text-xl font-bold text-rose-800">Mic &amp; Camera (RECORDER)</h1>
               <span className="ml-auto rounded-full bg-rose-100 px-2 py-0.5 text-xs text-rose-700">
                 account_id: <strong>{me!.account_id}</strong>
               </span>
@@ -168,10 +216,10 @@ export default function MicCameraClient() {
 
           {/* 上：カメラ */}
           <section aria-label="カメラ" className="rounded-2xl bg-white p-2 shadow-sm ring-1 ring-rose-100">
-            <CameraPreview apiBase={API_BASE} wsRef={wsRef} myDeviceId={myDeviceId} />
+            <CameraPreview apiBase={API_BASE} wsRef={wsRef} myDeviceId={myDeviceId} sendJson={sendJson} />
           </section>
 
-          {/* 下：文字起こし＋結果 */}
+          {/* 中：文字起こし */}
           <section aria-label="文字起こし" className="rounded-2xl bg-white/80 p-3 shadow-sm ring-1 ring-rose-100">
             <h2 className="text-sm font-semibold text-rose-700">文字起こし（リアルタイム）</h2>
             <div className="mt-2 rounded-lg bg-rose-50 px-3 py-2 text-rose-800 min-h-[44px]">
@@ -192,7 +240,29 @@ export default function MicCameraClient() {
             </div>
           </section>
 
-          {/* Speech コントローラ（UIなし） */}
+          {/* 下：直近の写真プレビュー（RECORDER＝自分以外の最新。なければ自分） */}
+          <section aria-label="直近の写真プレビュー" className="rounded-2xl bg-white p-2 shadow-sm ring-1 ring-rose-100">
+            <h2 className="text-sm font-semibold text-rose-700">直近の写真プレビュー</h2>
+            {!preview ? (
+              <div className="mt-2 rounded-lg bg-rose-50 p-3 text-rose-400">（まだ写真がありません）</div>
+            ) : (
+              <figure className="mt-2 overflow-hidden rounded-xl ring-1 ring-rose-100 bg-white">
+                <img
+                  src={imageSrc!}
+                  alt={preview.pictured_at ?? `seq=${preview.seq}`}
+                  className="block max-h-96 w-full object-contain bg-black/5"
+                  loading="eager"
+                  decoding="async"
+                />
+                <figcaption className="flex items-center justify-between px-3 py-2 text-xs text-rose-700">
+                  <span className="truncate">seq: {preview.seq}</span>
+                  <span className="rounded bg-rose-50 px-2 py-0.5">{preview.device_id}</span>
+                </figcaption>
+              </figure>
+            )}
+          </section>
+
+          {/* ★ UIなしの録音エンジン（必須） */}
           <SpeechController
             apiBase={API_BASE}
             defaultRegion={DEFAULT_REGION}
