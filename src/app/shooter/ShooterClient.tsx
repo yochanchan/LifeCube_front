@@ -119,7 +119,7 @@ export default function ShooterClient() {
         </div>
       ) : (
         <div className="mx-auto max-w-md p-4 space-y-4 sm:max-w-lg">
-          <header className="rounded-2xl bg-white/70 p-4 shadow-sm ring-1 ring-rose-100">
+          <header className="rounded-2xl bg-white/70 p-4 shadow-sm ring-1 ring-emerald-100">
             <div className="flex flex-wrap items-center gap-2">
               <h1 className="text-xl font-bold text-emerald-800">Shooter</h1>
               <span className="ml-auto rounded-full bg-emerald-100 px-2 py-0.5 text-xs text-emerald-700">
@@ -163,7 +163,6 @@ export default function ShooterClient() {
             myDeviceId={myDeviceId}
             policy="shooter"
             debounceMs={1200}
-            title="直近の写真プレビュー（SHOOTER視点）"
           />
         </div>
       )}
