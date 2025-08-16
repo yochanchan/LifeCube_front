@@ -5,6 +5,9 @@ export type WsMessage =
   | { type: "join_ok"; role: "recorder" | "shooter"; limits: { recorder_max: number; shooter_max: number } }
   | { type: "join_denied"; reason: "invalid_role" | "recorder_full" | "shooter_full" }
   | { type: "roster_update"; recorder: string | null; shooters: string[]; counts: { recorder: number; shooter: number } }
+  | { type: "recorder_granted"; device_id: string; ttl: number; deadline: number }
+  | { type: "recorder_denied"; holder_device_id: string | null }
+  | { type: "recorder_revoked"; device_id: string; reason: "expired" | "released" | "disconnected" }
   | { type: "ping" }
   | { type: "pong" }
   | { type: string;[k: string]: any };
