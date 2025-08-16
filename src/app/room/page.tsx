@@ -83,12 +83,16 @@ export default function RoomSelectPage() {
           </header>
 
           <section className="rounded-2xl bg-white p-3 shadow-sm ring-1 ring-rose-100 space-y-3">
-            <Link href="/mic_camera" className="block">
+            <Link href="/recorder" className="block">
               <button className="w-full rounded-xl bg-rose-500 px-4 py-2 font-semibold text-white hover:bg-rose-600">
                 RECORDERページへ
               </button>
             </Link>
-            {/* SHOOTERページは次フェーズで実装予定 */}
+            <Link href="/shooter" className="block">
+              <button className="w-full rounded-xl bg-emerald-500 px-4 py-2 font-semibold text-white hover:bg-emerald-600">
+                SHOOTERページへ
+              </button>
+            </Link>
             <Link href="/album" className="block">
               <button className="w-full rounded-xl bg-rose-100 px-4 py-2 font-semibold text-rose-700 ring-1 ring-rose-200 hover:bg-rose-50">
                 アルバムページへ
