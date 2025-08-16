@@ -5,10 +5,11 @@ import React, { useEffect, useMemo, useRef, useState, useCallback } from "react"
 import { useRouter } from "next/navigation";
 import CameraPreview from "./components/CameraPreview";
 import SpeechController from "./components/SpeechController";
+import { useRoomSocket } from "../../hooks/useRoomSocket";
 
 const API_BASE = (process.env.NEXT_PUBLIC_API_ENDPOINT ?? "").replace(/\/+$/, "");
 const WS_BASE = process.env.NEXT_PUBLIC_WS_URL ?? "";
-const DEFAULT_REGION = "japaneast";
+const DEFAULT_REGION = process.env.NEXT_PUBLIC_AZURE_SPEECH_REGION ?? "japaneast";
 
 function getOrCreateDeviceId(): string {
   try {
@@ -29,16 +30,16 @@ type Me = { account_id: number; email: string; role: string };
 export default function MicCameraClient() {
   const router = useRouter();
 
-  // Hooks（順序不変）
+  // 認証
   const [me, setMe] = useState<Me | null>(null);
   const [authChecked, setAuthChecked] = useState(false);
   const [status, setStatus] = useState("初期化中…");
   const [recActive, setRecActive] = useState(false);
-  const wsRef = useRef<WebSocket | null>(null);
 
-  const [liveText, setLiveText] = useState<string>(""); // interim
-  const [finalLines, setFinalLines] = useState<{ text: string; ts: number }[]>([]); // final履歴
-  const [triggerMsg, setTriggerMsg] = useState<string | null>(null); // バナー表示用
+  // transcript/バナー
+  const [liveText, setLiveText] = useState<string>("");
+  const [finalLines, setFinalLines] = useState<{ text: string; ts: number }[]>([]);
+  const [triggerMsg, setTriggerMsg] = useState<string | null>(null);
   const triggerTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const myDeviceId = useMemo(getOrCreateDeviceId, []);
@@ -69,71 +70,55 @@ export default function MicCameraClient() {
         if (!cancelled) setAuthChecked(true);
       }
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [router]);
 
-  // WS 接続
-  useEffect(() => {
-    if (!authReady || !room || !WS_BASE) return;
-    const raw = WS_BASE;                // 例: ws://localhost:8000
-    const url = new URL(raw);
-    if (!url.pathname || url.pathname === "/") {
-      url.pathname = "/camera/ws";      // パスが無い/ルートなら補正
-    }
-    url.searchParams.set("room", room);
-    url.searchParams.set("device_id", myDeviceId);
-
-    const ws = new WebSocket(url.toString());
-    wsRef.current = ws;
-
-    ws.onopen = () => console.log("[mic_camera] WS connected:", room);
-    ws.onerror = (e) => console.warn("[mic_camera] WS error:", e);
-    ws.onclose = () => console.warn("[mic_camera] WS closed");
-
-    return () => {
-      try { ws.close(); } catch { }
-      wsRef.current = null;
-    };
-  }, [authReady, room, myDeviceId]);
+  // ★ WS 接続（/ws）。message→ローカルイベントへ
+  const { wsRef, readyState, sendJson } = useRoomSocket({
+    base: WS_BASE,
+    room,
+    deviceId: myDeviceId,
+    onMessage: (msg) => {
+      if (msg?.type === "take_photo" && (msg as any).origin_device_id !== myDeviceId) {
+        window.dispatchEvent(new Event("mic-camera:take_photo"));
+      }
+    },
+  });
 
   // 発火：ローカル + WS
   const broadcastTakePhoto = useCallback(() => {
     window.dispatchEvent(new Event("mic-camera:take_photo"));
-    const ws = wsRef.current;
-    if (ws && ws.readyState === WebSocket.OPEN) {
-      ws.send(JSON.stringify({ type: "take_photo", origin_device_id: myDeviceId, ts: Date.now() }));
-    }
-  }, [myDeviceId]);
+    sendJson({ type: "take_photo", origin_device_id: myDeviceId, ts: Date.now() });
+  }, [sendJson, myDeviceId]);
 
-  // 文字起こし/発火の受け口
+  // 文字起こし
   const handleTranscript = useCallback((p: { text: string; isFinal: boolean; ts: number }) => {
     if (p.isFinal) {
       setLiveText("");
-      setFinalLines(prev => {
-        const next = [...prev, { text: p.text, ts: p.ts }];
-        return next.slice(-20); // 直近20行に制限
-      });
+      setFinalLines((prev) => [...prev, { text: p.text, ts: p.ts }].slice(-20));
     } else {
       setLiveText(p.text);
     }
   }, []);
 
-  const handleTrigger = useCallback((p: { keyword: string; source: "interim" | "final"; text: string; ts: number }) => {
-    broadcastTakePhoto();
-    // バナー表示
-    setTriggerMsg(`キーワード：「${p.keyword}」により撮影されました`);
-    if (triggerTimerRef.current) clearTimeout(triggerTimerRef.current);
-    triggerTimerRef.current = setTimeout(() => setTriggerMsg(null), 4000);
-  }, [broadcastTakePhoto]);
+  const handleTrigger = useCallback(
+    (p: { keyword: string; source: "interim" | "final"; text: string; ts: number }) => {
+      broadcastTakePhoto();
+      setTriggerMsg(`キーワード：「${p.keyword}」により撮影されました`);
+      if (triggerTimerRef.current) clearTimeout(triggerTimerRef.current);
+      triggerTimerRef.current = setTimeout(() => setTriggerMsg(null), 4000);
+    },
+    [broadcastTakePhoto]
+  );
 
-  // アンマウント時にタイマークリア
   useEffect(() => {
     return () => {
       if (triggerTimerRef.current) clearTimeout(triggerTimerRef.current);
     };
   }, []);
 
-  // レイアウト：スマホ前提で縦並び（上：カメラ / 下：テキスト）
   return (
     <main className="min-h-screen bg-gradient-to-b from-rose-50 via-pink-50 to-purple-50">
       {!authReady ? (
@@ -144,7 +129,6 @@ export default function MicCameraClient() {
         </div>
       ) : (
         <div className="mx-auto max-w-md p-4 space-y-4 sm:max-w-lg">
-          {/* ヘッダー */}
           <header className="rounded-2xl bg-white/70 p-4 shadow-sm ring-1 ring-rose-100">
             <div className="flex flex-wrap items-center gap-2">
               <h1 className="text-xl font-bold text-rose-800">Mic &amp; Camera</h1>
@@ -159,7 +143,7 @@ export default function MicCameraClient() {
             <div className="mt-3 flex items-center gap-2">
               <button
                 type="button"
-                onClick={() => setRecActive(v => !v)}
+                onClick={() => setRecActive((v) => !v)}
                 className={
                   "rounded-full px-4 py-2 text-white transition " +
                   (recActive ? "bg-rose-600 hover:bg-rose-700" : "bg-rose-500 hover:bg-rose-600")
@@ -170,10 +154,12 @@ export default function MicCameraClient() {
                 {recActive ? "■ 録音停止" : "▶ 録音開始"}
               </button>
               <p className="text-sm text-rose-600">{status}</p>
+              <span className="ml-auto text-xs text-rose-500">
+                WS: {["CONNECTING", "OPEN", "CLOSING", "CLOSED"][readyState] ?? readyState}
+              </span>
             </div>
           </header>
 
-          {/* バナー（トリガー通知） */}
           {triggerMsg && (
             <div className="rounded-xl bg-emerald-50 p-3 text-emerald-800 ring-1 ring-emerald-100">
               {triggerMsg}
@@ -188,13 +174,9 @@ export default function MicCameraClient() {
           {/* 下：文字起こし＋結果 */}
           <section aria-label="文字起こし" className="rounded-2xl bg-white/80 p-3 shadow-sm ring-1 ring-rose-100">
             <h2 className="text-sm font-semibold text-rose-700">文字起こし（リアルタイム）</h2>
-
-            {/* interim ライブ表示 */}
             <div className="mt-2 rounded-lg bg-rose-50 px-3 py-2 text-rose-800 min-h-[44px]">
               {liveText ? liveText : <span className="text-rose-400">（発話待機中）</span>}
             </div>
-
-            {/* final 履歴 */}
             <div className="mt-3 max-h-60 overflow-y-auto rounded-lg bg-white ring-1 ring-rose-100">
               {finalLines.length === 0 ? (
                 <div className="p-3 text-sm text-rose-400">（確定テキストはまだありません）</div>
@@ -218,7 +200,7 @@ export default function MicCameraClient() {
             onTranscript={handleTranscript}
             onTrigger={handleTrigger}
             onStatusChange={(s, d) => console.log("[Speech]", s, d ?? "")}
-            cooldownMs={5000} // PoC要件：送信側クールダウン5秒
+            cooldownMs={5000}
           />
         </div>
       )}
