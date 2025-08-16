@@ -3,7 +3,7 @@
 
 import React, { useEffect, useMemo, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import CameraPreview from "../mic_camera/components/CameraPreview";
+import CameraPreview from "../components/CameraPreview";
 import { useRoomSocket } from "../../hooks/useRoomSocket";
 import LatestPreview from "../components/LatestPreview";
 
@@ -108,7 +108,7 @@ export default function ShooterClient() {
 
   const manualSnap = useCallback(() => {
     // 手動撮影（CameraPreview 内のイベントに委ねる）
-    window.dispatchEvent(new Event("mic-camera:take_photo"));
+    window.dispatchEvent(new Event("app:take_photo"));
   }, []);
 
   return (
