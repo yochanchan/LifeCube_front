@@ -1,8 +1,8 @@
-// src/app/mic_camera/components/CameraPreview.tsx
+// src/app/components/CameraPreview.tsx
 "use client";
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { safeSend } from "../../../lib/ws";
+import { safeSend } from "../../lib/ws";
 
 type Props = {
   apiBase: string;
@@ -146,9 +146,9 @@ export default function CameraPreview({ apiBase, wsRef, myDeviceId, sendJson }: 
     const onLocal = () => {
       void snapAndUpload();
     };
-    window.addEventListener("mic-camera:take_photo", onLocal);
+    window.addEventListener("app:take_photo", onLocal);
     return () => {
-      window.removeEventListener("mic-camera:take_photo", onLocal);
+      window.removeEventListener("app:take_photo", onLocal);
     };
   }, [snapAndUpload]);
 

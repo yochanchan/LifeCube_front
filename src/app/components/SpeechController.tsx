@@ -1,4 +1,4 @@
-// src/app/mic_camera/components/SpeechController.tsx
+// src/app/components/SpeechController.tsx
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";

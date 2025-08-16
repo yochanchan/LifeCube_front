@@ -3,8 +3,8 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import CameraPreview from "../mic_camera/components/CameraPreview";
-import SpeechController from "../mic_camera/components/SpeechController";
+import CameraPreview from "../components/CameraPreview";
+import SpeechController from "../components/SpeechController";
 import LatestPreview from "../components/LatestPreview";
 import { useRoomSocket } from "../../hooks/useRoomSocket";
 import type { WsMessage } from "../../lib/ws";
@@ -103,7 +103,7 @@ export default function RecorderClient() {
     pingIntervalMs: 5000,
     onMessage: (msg: WsMessage) => {
       if (msg?.type === "take_photo" && (msg as any).origin_device_id !== myDeviceId) {
-        window.dispatchEvent(new Event("mic-camera:take_photo"));
+        window.dispatchEvent(new Event("app:take_photo"));
       }
       // photo_uploaded の最新選定は LatestPreview 側で処理するため、ここでは何もしない
     },
