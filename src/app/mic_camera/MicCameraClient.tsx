@@ -4,7 +4,7 @@
 import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import CameraPreview from "./components/CameraPreview";
-import SpeechController from "./components/SpeechController"; // ★ 重要：録音エンジン
+import SpeechController from "./components/SpeechController";
 import { useRoomSocket } from "../../hooks/useRoomSocket";
 import type { WsMessage } from "../../lib/ws";
 
@@ -12,7 +12,6 @@ const API_BASE = (process.env.NEXT_PUBLIC_API_ENDPOINT ?? "").replace(/\/+$/, ""
 const WS_BASE = process.env.NEXT_PUBLIC_WS_URL ?? "";
 const DEFAULT_REGION = process.env.NEXT_PUBLIC_AZURE_SPEECH_REGION ?? "japaneast";
 
-// 現行 MicCamera は RECORDER 用の画面として扱う（フェーズ4で分離予定）
 function getOrCreateDeviceId(): string {
   try {
     const KEY = "device_uid";
@@ -36,22 +35,43 @@ type PhotoItem = {
   pictured_at?: string;
 };
 
+// Join エラー文言の整形
+function humanJoinError(reason: "invalid_role" | "recorder_full" | "shooter_full" | "not_connected" | "timeout"): string {
+  switch (reason) {
+    case "invalid_role":
+      return "無効なロールです。";
+    case "recorder_full":
+      return "RECORDERの枠が埋まっています。";
+    case "shooter_full":
+      return "SHOOTERの枠が埋まっています。";
+    case "not_connected":
+      return "WebSocketが未接続です。";
+    case "timeout":
+      return "join応答がタイムアウトしました。";
+    default:
+      return "参加できませんでした。";
+  }
+}
+
 export default function MicCameraClient() {
   const router = useRouter();
 
-  // 認証
+  // 認証関連
   const [me, setMe] = useState<Me | null>(null);
   const [authChecked, setAuthChecked] = useState(false);
+  const authReady = authChecked && !!me;
+
+  // 画面状態
   const [status, setStatus] = useState("初期化中…");
   const [recActive, setRecActive] = useState(false);
 
-  // transcript/バナー
+  // 文字起こし
   const [liveText, setLiveText] = useState<string>("");
   const [finalLines, setFinalLines] = useState<{ text: string; ts: number }[]>([]);
   const [triggerMsg, setTriggerMsg] = useState<string | null>(null);
   const triggerTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // 最新プレビュー（RECORDERポリシー：自分以外の最大 seq）
+  // プレビュー（最新選択ロジック）
   const latestMapRef = useRef<Map<string, PhotoItem>>(new Map());
   const [preview, setPreview] = useState<PhotoItem | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -59,7 +79,6 @@ export default function MicCameraClient() {
 
   const myDeviceId = useMemo(getOrCreateDeviceId, []);
   const room = me ? `acc:${me.account_id}` : null;
-  const authReady = authChecked && !!me;
 
   // 認証チェック
   useEffect(() => {
@@ -91,12 +110,12 @@ export default function MicCameraClient() {
   }, [router]);
 
   // WS 接続
-  const { wsRef, readyState, sendJson } = useRoomSocket({
+  const { wsRef, readyState, sendJson, join, joinedRole, roster } = useRoomSocket({
     base: WS_BASE,
     room,
     deviceId: myDeviceId,
     onMessage: (msg: WsMessage) => {
-      // 1) take_photo → 既存どおりローカルイベントで撮影
+      // 1) take_photo → ローカルイベントで撮影
       if (msg?.type === "take_photo" && (msg as any).origin_device_id !== myDeviceId) {
         window.dispatchEvent(new Event("mic-camera:take_photo"));
       }
@@ -114,11 +133,10 @@ export default function MicCameraClient() {
         if (!prev || item.seq > prev.seq) {
           map.set(item.device_id, item);
         }
-        // デバウンスして描画候補を更新
         if (debounceRef.current) clearTimeout(debounceRef.current);
         debounceRef.current = setTimeout(() => {
           const values = Array.from(map.values());
-          // 自分以外の最大 seq を優先
+          // RECORDERポリシー：自分以外の最大 seq（なければ全体の最大）
           const others = values.filter((v) => v.device_id !== myDeviceId);
           const pickFrom = (others.length > 0 ? others : values).sort((a, b) => b.seq - a.seq);
           setPreview(pickFrom[0] ?? null);
@@ -127,13 +145,38 @@ export default function MicCameraClient() {
     },
   });
 
-  // 発火：ローカル + WS
+  // RECORDER として join（上限超過はメッセージ表示）
+  useEffect(() => {
+    if (!authReady || !room) return;
+    if (readyState !== WebSocket.OPEN) return;
+    if (joinedRole) return; // 既にjoin済み
+
+    let disposed = false;
+    (async () => {
+      const res = await join("recorder");
+      if (disposed) return;
+
+      if ("reason" in res) {
+        const msg = humanJoinError(res.reason);
+        alert(msg);
+        setStatus(`join_denied: ${res.reason}`);
+        return;
+      }
+      setStatus("RECORDERとして参加しました");
+    })();
+
+    return () => {
+      disposed = true;
+    };
+  }, [authReady, room, readyState, joinedRole, join]);
+
+  // 撮影トリガ
   const broadcastTakePhoto = useCallback(() => {
     window.dispatchEvent(new Event("mic-camera:take_photo"));
     sendJson({ type: "take_photo", origin_device_id: myDeviceId, ts: Date.now() });
   }, [sendJson, myDeviceId]);
 
-  // 文字起こし
+  // 文字起こしハンドラ
   const handleTranscript = useCallback((p: { text: string; isFinal: boolean; ts: number }) => {
     if (p.isFinal) {
       setLiveText("");
@@ -153,6 +196,7 @@ export default function MicCameraClient() {
     [broadcastTakePhoto]
   );
 
+  // タイマー類のクリーンアップ
   useEffect(() => {
     return () => {
       if (triggerTimerRef.current) clearTimeout(triggerTimerRef.current);
@@ -160,7 +204,7 @@ export default function MicCameraClient() {
     };
   }, []);
 
-  // 画像URLを絶対化（相対なら API_BASE を前置）
+  // プレビュー画像URL（フル画像）
   const imageSrc = preview
     ? preview.image_url.startsWith("/")
       ? `${API_BASE}${preview.image_url}`
@@ -171,9 +215,7 @@ export default function MicCameraClient() {
     <main className="min-h-screen bg-gradient-to-b from-rose-50 via-pink-50 to-purple-50">
       {!authReady ? (
         <div className="mx-auto max-w-5xl p-4">
-          <div className="rounded-xl bg-white/80 p-4 ring-1 ring-rose-100 text-rose-700">
-            {status}
-          </div>
+          <div className="rounded-xl bg-white/80 p-4 ring-1 ring-rose-100 text-rose-700">{status}</div>
         </div>
       ) : (
         <div className="mx-auto max-w-md p-4 space-y-4 sm:max-w-lg">
@@ -181,7 +223,7 @@ export default function MicCameraClient() {
             <div className="flex flex-wrap items-center gap-2">
               <h1 className="text-xl font-bold text-rose-800">Mic &amp; Camera (RECORDER)</h1>
               <span className="ml-auto rounded-full bg-rose-100 px-2 py-0.5 text-xs text-rose-700">
-                account_id: <strong>{me!.account_id}</strong>
+                account_id: <strong>{me?.account_id}</strong>
               </span>
               <span className="rounded-full bg-rose-100 px-2 py-0.5 text-xs text-rose-700">
                 room_id: <strong>{room}</strong>
@@ -192,6 +234,7 @@ export default function MicCameraClient() {
               <button
                 type="button"
                 onClick={() => setRecActive((v) => !v)}
+                disabled={!joinedRole}
                 className={
                   "rounded-full px-4 py-2 text-white transition " +
                   (recActive ? "bg-rose-600 hover:bg-rose-700" : "bg-rose-500 hover:bg-rose-600")
@@ -206,12 +249,17 @@ export default function MicCameraClient() {
                 WS: {["CONNECTING", "OPEN", "CLOSING", "CLOSED"][readyState] ?? readyState}
               </span>
             </div>
+
+            {/* roster ミニ表示（任意） */}
+            {roster && (
+              <div className="mt-2 text-xs text-rose-600">
+                RECORDER {roster.counts.recorder}/1, SHOOTER {roster.counts.shooter}/4
+              </div>
+            )}
           </header>
 
           {triggerMsg && (
-            <div className="rounded-xl bg-emerald-50 p-3 text-emerald-800 ring-1 ring-emerald-100">
-              {triggerMsg}
-            </div>
+            <div className="rounded-xl bg-emerald-50 p-3 text-emerald-800 ring-1 ring-emerald-100">{triggerMsg}</div>
           )}
 
           {/* 上：カメラ */}
@@ -222,7 +270,7 @@ export default function MicCameraClient() {
           {/* 中：文字起こし */}
           <section aria-label="文字起こし" className="rounded-2xl bg-white/80 p-3 shadow-sm ring-1 ring-rose-100">
             <h2 className="text-sm font-semibold text-rose-700">文字起こし（リアルタイム）</h2>
-            <div className="mt-2 rounded-lg bg-rose-50 px-3 py-2 text-rose-800 min-h-[44px]">
+            <div className="mt-2 min-h-[44px] rounded-lg bg-rose-50 px-3 py-2 text-rose-800">
               {liveText ? liveText : <span className="text-rose-400">（発話待機中）</span>}
             </div>
             <div className="mt-3 max-h-60 overflow-y-auto rounded-lg bg-white ring-1 ring-rose-100">
@@ -240,17 +288,17 @@ export default function MicCameraClient() {
             </div>
           </section>
 
-          {/* 下：直近の写真プレビュー（RECORDER＝自分以外の最新。なければ自分） */}
+          {/* 下：直近の写真プレビュー（フル画像） */}
           <section aria-label="直近の写真プレビュー" className="rounded-2xl bg-white p-2 shadow-sm ring-1 ring-rose-100">
             <h2 className="text-sm font-semibold text-rose-700">直近の写真プレビュー</h2>
             {!preview ? (
               <div className="mt-2 rounded-lg bg-rose-50 p-3 text-rose-400">（まだ写真がありません）</div>
             ) : (
-              <figure className="mt-2 overflow-hidden rounded-xl ring-1 ring-rose-100 bg-white">
+              <figure className="mt-2 overflow-hidden rounded-xl bg-white ring-1 ring-rose-100">
                 <img
                   src={imageSrc!}
                   alt={preview.pictured_at ?? `seq=${preview.seq}`}
-                  className="block max-h-96 w-full object-contain bg-black/5"
+                  className="block max-h-96 w-full bg-black/5 object-contain"
                   loading="eager"
                   decoding="async"
                 />
@@ -262,7 +310,7 @@ export default function MicCameraClient() {
             )}
           </section>
 
-          {/* ★ UIなしの録音エンジン（必須） */}
+          {/* 録音エンジン（UIなし） */}
           <SpeechController
             apiBase={API_BASE}
             defaultRegion={DEFAULT_REGION}
