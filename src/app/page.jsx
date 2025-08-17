@@ -8,6 +8,8 @@ export default function Home() {
       <h1 className="text-2xl font-bold mb-6">HondaCamera</h1>
       <div className="space-y-8">
         <section>
+
+{/* 90d6d63 (大改造ビフォーアフター) */}
           <Link href="/login">
             <button className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded">
               ログイン（アルバム、カメラ用）
@@ -36,6 +38,11 @@ export default function Home() {
             <Link href="/album">
               <button className="bg-rose-500 hover:bg-rose-600 text-white px-4 py-2 rounded">
                 アルバム（/album）
+              </button>
+            </Link>
+            <Link href="/display">
+              <button className="bg-purple-500 hover:bg-purple-600 text-white px-4 py-2 rounded">
+                表示（/display）
               </button>
             </Link>
           </div>
