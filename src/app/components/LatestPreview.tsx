@@ -33,6 +33,7 @@ type LatestPreviewProps = {
   policy: Policy;
   myDeviceId: string;
   debounceMs?: number;
+  wsReady?: WebSocket["readyState"];
 };
 
 export default function LatestPreview({
@@ -41,6 +42,7 @@ export default function LatestPreview({
   policy,
   myDeviceId,
   debounceMs = 1200,
+  wsReady,
 }: LatestPreviewProps) {
   const latestMapRef = useRef<Map<string, PhotoItem>>(new Map());
   const [preview, setPreview] = useState<PhotoItem | null>(null);
@@ -48,12 +50,13 @@ export default function LatestPreview({
 
   useEffect(() => {
     const ws = wsRef.current;
-    if (!ws) return;
+    if (!ws || ws.readyState !== WebSocket.OPEN) return; // OPEN時だけ
 
-    const onMessage = (ev: MessageEvent) => {
+    const onMessage = async (ev: MessageEvent) => {
       try {
         const msg = JSON.parse(ev.data);
         if (msg?.type !== "photo_uploaded") return;
+        if (typeof msg.seq !== "number" || !Number.isFinite(msg.seq)) return;
 
         const m = msg as MsgPhotoUploaded;
         const item: PhotoItem = {
@@ -96,7 +99,7 @@ export default function LatestPreview({
       ws.removeEventListener("message", onMessage);
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
-  }, [wsRef, policy, myDeviceId, debounceMs]);
+  }, [wsRef, policy, myDeviceId, debounceMs, wsReady]);
 
   const imageSrc = useMemo(
     () => (preview ? toAbsUrl(apiBase, preview.image_url) : null),

@@ -137,7 +137,7 @@ export default function RecorderClient() {
   // “撮影要求のブロードキャスト”（音声キーワード検出時に送信）
   const broadcastTakePhoto = useCallback(() => {
     // 自分も撮影
-    window.dispatchEvent(new Event("mic-camera:take_photo"));
+    window.dispatchEvent(new Event("app:take_photo"));
     // 他端末へ“撮影して”を通知
     sendJson({ type: "take_photo", origin_device_id: myDeviceId, ts: Date.now() });
   }, [sendJson, myDeviceId]);
@@ -258,6 +258,7 @@ export default function RecorderClient() {
               policy="recorder"
               myDeviceId={myDeviceId}
               debounceMs={1200}
+              wsReady={readyState}
             />
           </section>
 

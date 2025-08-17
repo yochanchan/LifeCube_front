@@ -163,6 +163,7 @@ export default function ShooterClient() {
             myDeviceId={myDeviceId}
             policy="shooter"
             debounceMs={1200}
+            wsReady={readyState}
           />
         </div>
       )}
