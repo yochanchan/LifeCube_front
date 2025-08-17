@@ -168,6 +168,11 @@ export default function Home() {
                 アルバム（/album）
               </button>
             </Link>
+            <Link href="/display">
+              <button className="bg-purple-500 hover:bg-purple-600 text-white px-4 py-2 rounded">
+                表示（/display）
+              </button>
+            </Link>
           </div>
         </section>
       </div>
