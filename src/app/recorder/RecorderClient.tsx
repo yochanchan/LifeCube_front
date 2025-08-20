@@ -56,6 +56,7 @@ export default function RecorderClient() {
 
   const [status, setStatus] = useState("初期化中…");
   const [recActive, setRecActive] = useState(false);
+  const [latestPhotoUrl, setLatestPhotoUrl] = useState<string | null>(null);
 
   // 文字起こしの状態（MicCamera と同等）
   const [liveText, setLiveText] = useState<string>("");
@@ -162,6 +163,10 @@ export default function RecorderClient() {
     [broadcastTakePhoto]
   );
 
+  const handlePhotoChange = (photoUrl: string | null, photoData: any) => {
+    setLatestPhotoUrl(photoUrl);
+  };
+
   // タイマー類のクリーンアップ
   useEffect(() => {
     return () => {
@@ -173,21 +178,21 @@ export default function RecorderClient() {
     roster && `RECORDER ${roster.counts.recorder}/1, SHOOTER ${roster.counts.shooter}/4`;
 
   return (
-    <main className="min-h-screen bg-gradient-to-b from-rose-50 via-pink-50 to-purple-50">
+            <main className="min-h-screen" style={{ backgroundColor: '#BDD9D7' }}>
       {!authReady ? (
         <div className="mx-auto max-w-5xl p-4">
-          <div className="rounded-xl bg-white/80 p-4 ring-1 ring-rose-100 text-rose-700">{status}</div>
+                       <div className="rounded-xl bg-white/80 p-4 ring-1 ring-rose-100" style={{ color: '#2B578A' }}>{status}</div>
         </div>
       ) : (
         <div className="mx-auto max-w-md p-4 space-y-4 sm:max-w-lg">
           {/* ヘッダ */}
           <header className="rounded-2xl bg-white/70 p-4 shadow-sm ring-1 ring-rose-100">
             <div className="flex flex-wrap items-center gap-2">
-              <h1 className="text-xl font-bold text-rose-800">Recorder</h1>
-              <span className="ml-auto rounded-full bg-rose-100 px-2 py-0.5 text-xs text-rose-700">
+              <h1 className="text-xl font-bold" style={{ color: '#2B578A' }}>Recorder</h1>
+                             <span className="ml-auto rounded-full bg-rose-100 px-2 py-0.5 text-xs" style={{ color: '#2B578A' }}>
                 account_id: <strong>{me?.account_id}</strong>
               </span>
-              <span className="rounded-full bg-rose-100 px-2 py-0.5 text-xs text-rose-700">
+                             <span className="rounded-full bg-rose-100 px-2 py-0.5 text-xs" style={{ color: '#2B578A' }}>
                 room: <strong>{room}</strong>
               </span>
             </div>
@@ -197,22 +202,25 @@ export default function RecorderClient() {
                 type="button"
                 onClick={() => setRecActive((v) => !v)}
                 disabled={!joinedRole}
-                className={
-                  "rounded-full px-4 py-2 text-white transition " +
-                  (recActive ? "bg-rose-600 hover:bg-rose-700" : "bg-rose-500 hover:bg-rose-600")
-                }
+                                 className={
+                   "rounded-full px-4 py-2 text-white transition " +
+                   (recActive ? "hover:opacity-80" : "hover:opacity-80")
+                 }
+                 style={{
+                   backgroundColor: recActive ? '#2B578A' : '#2B578A'
+                 }}
                 aria-pressed={recActive}
                 title={recActive ? "録音停止" : "録音開始"}
               >
                 {recActive ? "■ 録音停止" : "▶ 録音開始"}
               </button>
-              <p className="text-sm text-rose-600">{status}</p>
-              <span className="ml-auto text-xs text-rose-500">
+                             <p className="text-sm" style={{ color: '#2B578A' }}>{status}</p>
+                             <span className="ml-auto text-xs" style={{ color: '#2B578A' }}>
                 WS: {["CONNECTING", "OPEN", "CLOSING", "CLOSED"][readyState] ?? readyState}
               </span>
             </div>
 
-            {rosterText && <div className="mt-2 text-xs text-rose-600">{rosterText}</div>}
+                         {rosterText && <div className="mt-2 text-xs" style={{ color: '#2B578A' }}>{rosterText}</div>}
           </header>
 
           {/* 上：カメラ */}
@@ -222,17 +230,17 @@ export default function RecorderClient() {
 
           {/* 中：文字起こし（← ここを“カメラとプレビューの間”に配置） */}
           <section aria-label="文字起こし" className="rounded-2xl bg-white/80 p-3 shadow-sm ring-1 ring-rose-100">
-            <h2 className="text-sm font-semibold text-rose-700">文字起こし（リアルタイム）</h2>
-            <div className="mt-2 min-h-[44px] rounded-lg bg-rose-50 px-3 py-2 text-rose-800">
-              {liveText ? liveText : <span className="text-rose-400">（発話待機中）</span>}
+                         <h2 className="text-sm font-semibold" style={{ color: '#2B578A' }}>文字起こし（リアルタイム）</h2>
+                         <div className="mt-2 min-h-[44px] rounded-lg bg-rose-50 px-3 py-2" style={{ color: '#2B578A' }}>
+                             {liveText ? liveText : <span style={{ color: '#2B578A' }}>（発話待機中）</span>}
             </div>
             <div className="mt-3 max-h-60 overflow-y-auto rounded-lg bg-white ring-1 ring-rose-100">
               {finalLines.length === 0 ? (
-                <div className="p-3 text-sm text-rose-400">（確定テキストはまだありません）</div>
+                                 <div className="p-3 text-sm" style={{ color: '#2B578A' }}>（確定テキストはまだありません）</div>
               ) : (
                 <ul className="divide-y divide-rose-100">
                   {finalLines.map((l, i) => (
-                    <li key={l.ts + ":" + i} className="p-3 text-sm text-rose-800">
+                                         <li key={l.ts + ":" + i} className="p-3 text-sm" style={{ color: '#2B578A' }}>
                       {new Date(l.ts).toLocaleTimeString()}：{l.text}
                     </li>
                   ))}
@@ -243,7 +251,7 @@ export default function RecorderClient() {
 
           {/* キーワードで撮影した通知（任意） */}
           {triggerMsg && (
-            <div className="rounded-xl bg-emerald-50 p-3 text-emerald-800 ring-1 ring-emerald-100">{triggerMsg}</div>
+                         <div className="rounded-xl bg-emerald-50 p-3 ring-1 ring-emerald-100" style={{ color: '#2B578A' }}>{triggerMsg}</div>
           )}
 
           {/* 下：直近の写真プレビュー（RECORDERポリシー = “自分以外を優先し、seq最大”） */}
@@ -251,7 +259,7 @@ export default function RecorderClient() {
             aria-label="直近の写真プレビュー"
             className="rounded-2xl bg-white p-2 shadow-sm ring-1 ring-rose-100"
           >
-            <h2 className="text-sm font-semibold text-rose-700">直近の写真プレビュー</h2>
+                         <h2 className="text-sm font-semibold" style={{ color: '#2B578A' }}>直近の写真プレビュー</h2>
             <LatestPreview
               apiBase={API_BASE}
               wsRef={wsRef}
@@ -260,6 +268,15 @@ export default function RecorderClient() {
               debounceMs={1200}
               wsReady={readyState}
             />
+            <div className="mt-3 text-center">
+              <button
+                type="button"
+                className="rounded-full px-6 py-2 text-white hover:opacity-80 transition-opacity"
+                style={{ backgroundColor: '#2B578A' }}
+              >
+                編集
+              </button>
+            </div>
           </section>
 
           {/* 録音エンジン（UIなし） */}

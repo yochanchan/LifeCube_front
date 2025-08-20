@@ -35,6 +35,7 @@ export default function ShooterClient() {
   const authReady = authChecked && !!me;
 
   const [status, setStatus] = useState("初期化中…");
+  const [latestPhotoUrl, setLatestPhotoUrl] = useState<string | null>(null);
 
   const myDeviceId = useMemo(getOrCreateDeviceId, []);
   const room = me ? `acc:${me.account_id}` : null;
@@ -111,8 +112,12 @@ export default function ShooterClient() {
     window.dispatchEvent(new Event("app:take_photo"));
   }, []);
 
+  const handlePhotoChange = (photoUrl: string | null, photoData: any) => {
+    setLatestPhotoUrl(photoUrl);
+  };
+
   return (
-    <main className="min-h-screen bg-gradient-to-b from-rose-50 via-pink-50 to-purple-50">
+            <main className="min-h-screen" style={{ backgroundColor: '#BDD9D7' }}>
       {!authReady ? (
         <div className="mx-auto max-w-5xl p-4">
           <div className="rounded-xl bg-white/80 p-4 ring-1 ring-rose-100 text-rose-700">{status}</div>
@@ -131,11 +136,12 @@ export default function ShooterClient() {
             </div>
 
             <div className="mt-3 flex items-center gap-2">
-              <button
-                type="button"
-                onClick={manualSnap}
-                className="rounded-full bg-emerald-500 px-4 py-2 text-white hover:bg-emerald-600"
-              >
+                             <button
+                 type="button"
+                 onClick={manualSnap}
+                 className="rounded-full px-4 py-2 text-white hover:opacity-80 transition-opacity"
+                 style={{ backgroundColor: '#2B578A' }}
+               >
                 手動で撮影
               </button>
               <span className="ml-auto text-xs text-emerald-600">
@@ -156,15 +162,24 @@ export default function ShooterClient() {
             <CameraPreview apiBase={API_BASE} wsRef={wsRef} myDeviceId={myDeviceId} />
           </section>
 
-          {/* 下：直近の写真プレビュー（SHOOTERポリシー：自分の写真のみ） */}
-          <LatestPreview
-            apiBase={API_BASE}
-            wsRef={wsRef}
-            myDeviceId={myDeviceId}
-            policy="shooter"
-            debounceMs={1200}
-            wsReady={readyState}
-          />
+                     {/* 下：直近の写真プレビュー（SHOOTERポリシー：自分の写真のみ） */}
+           <LatestPreview
+             apiBase={API_BASE}
+             wsRef={wsRef}
+             myDeviceId={myDeviceId}
+             policy="shooter"
+             debounceMs={1200}
+             wsReady={readyState}
+           />
+           <div className="mt-3 text-center">
+             <button
+               type="button"
+               className="rounded-full px-6 py-2 text-white hover:opacity-80 transition-opacity"
+               style={{ backgroundColor: '#2B578A' }}
+             >
+               編集
+             </button>
+           </div>
         </div>
       )}
     </main>

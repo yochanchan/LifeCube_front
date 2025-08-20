@@ -56,8 +56,8 @@ export default function AuthPage() {
         throw new Error(msg);
       }
 
-      // 成功 → /トップページ へ
-      router.push("/");
+      // 成功 → roomページ へ
+      router.push("/room");
     } catch (e: any) {
       setErr(e?.message ?? String(e));
     } finally {
