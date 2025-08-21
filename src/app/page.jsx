@@ -4,12 +4,10 @@ import Link from "next/link";
 
 export default function Home() {
   return (
-    <div className="p-8">
+    <div className="p-8 bg-teal-50 min-h-screen">
       <h1 className="text-2xl font-bold mb-6">HondaCamera</h1>
       <div className="space-y-8">
         <section>
-
-{/* 90d6d63 (大改造ビフォーアフター) */}
           <Link href="/login">
             <button className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded">
               ログイン（アルバム、カメラ用）

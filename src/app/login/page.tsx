@@ -3,6 +3,7 @@
 
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
+import LoginUI from "./UI";
 
 /** APIベースURL（末尾の / を除去） */
 const API_BASE_RAW = process.env.NEXT_PUBLIC_API_ENDPOINT;
@@ -55,8 +56,8 @@ export default function AuthPage() {
         throw new Error(msg);
       }
 
-      // 成功 → /トップページ へ
-      router.push("/");
+      // 成功 → roomページ へ
+      router.push("/room");
     } catch (e: any) {
       setErr(e?.message ?? String(e));
     } finally {
@@ -70,64 +71,20 @@ export default function AuthPage() {
     if (!loading) submit("login");
   };
 
+  const handleSignup = () => {
+    if (!loading) submit("signup");
+  };
+
   return (
-    <main className="min-h-screen flex items-center justify-center bg-rose-50 p-4">
-      <form
-        onSubmit={onSubmit}
-        className="w-full max-w-sm rounded-2xl bg-white/90 p-6 shadow ring-1 ring-rose-100"
-      >
-        <h1 className="text-center text-2xl font-extrabold text-rose-800">ログイン / 新規登録</h1>
-
-        {/* 入力2行（メール、パスワード） */}
-        <div className="mt-6 space-y-3">
-          <input
-            type="text" // PoC用になんでも通す
-            inputMode="email"
-            autoComplete="email"
-            placeholder="you@example.com"
-            className="w-full rounded-xl border border-rose-200 px-3 py-2 outline-none focus:ring-2 focus:ring-rose-300"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-          />
-          <input
-            type="password"
-            minLength={3} // PoC用に3文字でok
-            autoComplete="current-password"
-            placeholder="パスワード"
-            className="w-full rounded-xl border border-rose-200 px-3 py-2 outline-none focus:ring-2 focus:ring-rose-300"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-          />
-        </div>
-
-        {/* エラー表示 */}
-        {err && (
-          <p className="mt-3 rounded-xl bg-rose-50 p-2 text-sm text-rose-700">{err}</p>
-        )}
-
-        {/* ボタン横2列（ログイン / 新規作成） */}
-        <div className="mt-4 grid grid-cols-2 gap-3">
-          <button
-            type="submit"
-            disabled={loading !== null}
-            className="rounded-xl bg-rose-500 px-4 py-2 font-semibold text-white shadow hover:bg-rose-600 disabled:opacity-50"
-            title="ログイン"
-          >
-            {loading === "login" ? "ログイン中…" : "ログイン"}
-          </button>
-          <button
-            type="button"
-            disabled={loading !== null}
-            onClick={() => submit("signup")}
-            className="rounded-xl bg-rose-100 px-4 py-2 font-semibold text-rose-700 ring-1 ring-rose-200 hover:bg-rose-50 disabled:opacity-50"
-            title="新規ID登録"
-          >
-            {loading === "signup" ? "作成中…" : "新規ID登録"}
-          </button>
-        </div>
-      </form>
-    </main>
+    <LoginUI
+      email={email}
+      password={password}
+      loading={loading}
+      error={err}
+      onEmailChange={setEmail}
+      onPasswordChange={setPassword}
+      onLogin={onSubmit}
+      onSignup={handleSignup}
+    />
   );
 }
