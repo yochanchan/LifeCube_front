@@ -1,0 +1,12 @@
+diff a/src/app/room/page.tsx b/src/app/room/page.tsx	(rejected hunks)
+@@ -15,7 +15,9 @@
+     const KEY = "device_uid";
+     let id = localStorage.getItem(KEY);
+     if (!id) {
+-      id = crypto.randomUUID();
++      // 古いiOS対策: randomUUIDが無い場合のフォールバック
++      const rnd = (globalThis.crypto as any)?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(16).slice(2)}`;
++      id = rnd;
+       localStorage.setItem(KEY, id);
+     }
+     return id;
