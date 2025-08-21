@@ -36,8 +36,17 @@ function matchKeyword(text: string): string | null {
   const t = normalizeJa(text);
   const rules: { keyword: string; re: RegExp }[] = [
     { keyword: "とる/撮る", re: /(と|とっ|とれ|とる|とって)/ },
+    { keyword: "とる/撮る", re: /(とっ|とれ|とる|とって|取って|撮って|取る|撮る)/ },
     { keyword: "シャッター", re: /(しゃった)/ },
     { keyword: "写真/撮影", re: /(しゃしん|さつえい)/ },
+    { keyword: "はい、チーズ", re: /(はいちーず|ちーず)/ }, // ← 250821追加
+    { keyword: "すごい/最高", re: /(すごい|すげー|やばい|最高|すばらしい|素晴らしい|ぜっけい|絶景|景色)/ }, // ← 250821追加
+    { keyword: "きれい/美しい", re: /(きれい|うつくしい|美しい)/ }, // ← 250821追加
+    { keyword: "見て/発見", re: /(みて|見て|あれ|なにあれ|おもしろい|めずらしい|面白い|珍しい)/ }, // ← 250821追加
+    { keyword: "かわいい", re: /(かわいい|可愛い|かわいー|ねがお|寝顔)/ }, // ← 250821追加
+    { keyword: "驚き/感嘆", re: /(うわ|うわー|まじで)/ }, // ← 250821追加
+    { keyword: "楽しい/面白い", re: /(たのしい|楽しい|うける|受ける|わらった|笑った|笑顔|えがお)/ }, // ← 250821追加
+    { keyword: "大きい", re: /(おおきい|大きい|でかい|でっかい)/ }, // ← 250821追加
   ];
   for (const r of rules) if (r.re.test(t)) return r.keyword;
   return null;
