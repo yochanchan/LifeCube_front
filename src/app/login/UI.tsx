@@ -37,20 +37,20 @@ export default function LoginUI({
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
             </svg>
           </div>
-          <h1 className="text-2xl font-bold mb-2" style={{ color: '#2B578A' }}>HONDAカメラ</h1>
+          <h1 className="text-2xl mb-2" style={{ color: '#2B578A' }}>HONDAカメラ</h1>
           <p className="text-sm" style={{ color: '#2B578A' }}>思い出を記録する旅行写真アプリ</p>
         </div>
 
         {/* ログインフォーム */}
         <div className="bg-white rounded-2xl shadow-lg p-6">
-          <h2 className="text-center text-xl font-bold mb-6" style={{ color: '#2B578A' }}>ログイン / 新規登録</h2>
+          <h2 className="text-center text-xl mb-6" style={{ color: '#2B578A' }}>ログイン / 新規登録</h2>
 
           {/* フォーム */}
           <form onSubmit={onLogin}>
             <div className="space-y-4">
               {/* メールアドレス */}
               <div>
-                <label htmlFor="email" className="block text-sm font-medium mb-2" style={{ color: '#2B578A' }}>
+                <label htmlFor="email" className="block text-sm mb-2" style={{ color: '#2B578A' }}>
                   メールアドレス
                 </label>
                 <input
@@ -72,7 +72,7 @@ export default function LoginUI({
 
               {/* パスワード */}
               <div>
-                <label htmlFor="password" className="block text-sm font-medium mb-2" style={{ color: '#2B578A' }}>
+                <label htmlFor="password" className="block text-sm mb-2" style={{ color: '#2B578A' }}>
                   パスワード
                 </label>
                 <div className="relative">
@@ -121,7 +121,7 @@ export default function LoginUI({
               <button
                 type="submit"
                 disabled={loading !== null}
-                className="w-full text-white font-medium py-3 px-4 rounded-lg transition-colors"
+                className="w-full text-white py-3 px-4 rounded-lg transition-colors"
                 style={{ 
                   backgroundColor: loading === "login" ? '#9CA3AF' : '#2B578A',
                   opacity: loading !== null ? 0.7 : 1
@@ -135,7 +135,7 @@ export default function LoginUI({
                 type="button"
                 disabled={loading !== null}
                 onClick={onSignup}
-                className="w-full text-white font-medium py-3 px-4 rounded-lg transition-colors"
+                className="w-full text-white py-3 px-4 rounded-lg transition-colors"
                 style={{ 
                   backgroundColor: loading === "signup" ? '#9CA3AF' : '#2B578A',
                   opacity: loading !== null ? 0.7 : 1

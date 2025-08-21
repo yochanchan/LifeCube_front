@@ -325,7 +325,7 @@ export default function AlbumClient({
         <div className="mx-auto max-w-6xl px-4 py-8">
           {/* ヘッダー */}
           <header className="text-center mb-8">
-            <h1 className="text-4xl font-bold mb-4" style={{ color: '#2B578A' }}>アルバム</h1>
+            <h1 className="text-4xl mb-4" style={{ color: '#2B578A' }}>アルバム</h1>
           </header>
 
           {/* メインスライドショー */}
@@ -354,7 +354,7 @@ export default function AlbumClient({
 
           {/* 日付セレクタ */}
           <section className="mb-8">
-            <h2 className="text-lg font-semibold mb-4" style={{ color: '#2B578A' }}>アルバム日付</h2>
+            <h2 className="text-lg mb-4" style={{ color: '#2B578A' }}>アルバム日付</h2>
             <DateChips
               dates={dates ?? []}
               loading={!!loadingDates}

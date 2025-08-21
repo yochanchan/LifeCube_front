@@ -62,7 +62,7 @@ export default function DisplayClient() {
         {/* ヘッダー */}
         <header className="mb-6 rounded-2xl bg-white/70 p-6 shadow-sm ring-1 ring-orange-100">
           <div className="flex flex-wrap items-center gap-4">
-            <h1 className="text-3xl font-bold text-orange-800">最新画像表示</h1>
+            <h1 className="text-3xl text-orange-800">最新画像表示</h1>
             <span className="ml-auto rounded-full bg-orange-100 px-3 py-1 text-sm text-orange-700">
               account_id: <strong>{me.account_id}</strong>
             </span>

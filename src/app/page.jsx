@@ -5,7 +5,7 @@ import Link from "next/link";
 export default function Home() {
   return (
     <div className="p-8 bg-teal-50 min-h-screen">
-      <h1 className="text-2xl font-bold mb-6">HondaCamera</h1>
+      <h1 className="text-2xl mb-6">HondaCamera</h1>
       <div className="space-y-8">
         <section>
           <Link href="/login">
@@ -16,7 +16,7 @@ export default function Home() {
         </section>
 
         <section>
-          <h2 className="text-xl font-bold mb-4">機能</h2>
+          <h2 className="text-xl mb-4">機能</h2>
           <div className="flex gap-3 flex-wrap">
             <Link href="/room">
               <button className="bg-indigo-500 hover:bg-indigo-600 text-white px-4 py-2 rounded">
