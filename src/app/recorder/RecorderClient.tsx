@@ -188,7 +188,7 @@ export default function RecorderClient() {
           {/* ヘッダ */}
           <header className="rounded-2xl bg-white/70 p-4 shadow-sm ring-1 ring-rose-100">
             <div className="flex flex-wrap items-center gap-2">
-              <h1 className="text-xl font-bold" style={{ color: '#2B578A' }}>Recorder</h1>
+              <h1 className="text-xl" style={{ color: '#2B578A' }}>Recorder</h1>
                              <span className="ml-auto rounded-full bg-rose-100 px-2 py-0.5 text-xs" style={{ color: '#2B578A' }}>
                 account_id: <strong>{me?.account_id}</strong>
               </span>
@@ -212,7 +212,7 @@ export default function RecorderClient() {
                 aria-pressed={recActive}
                 title={recActive ? "録音停止" : "録音開始"}
               >
-                {recActive ? "■ 録音停止" : "▶ 録音開始"}
+                                 {recActive ? "■ 録音停止" : "▶ HONDAカメラ始動"}
               </button>
                              <p className="text-sm" style={{ color: '#2B578A' }}>{status}</p>
                              <span className="ml-auto text-xs" style={{ color: '#2B578A' }}>
@@ -230,7 +230,7 @@ export default function RecorderClient() {
 
           {/* 中：文字起こし（← ここを“カメラとプレビューの間”に配置） */}
           <section aria-label="文字起こし" className="rounded-2xl bg-white/80 p-3 shadow-sm ring-1 ring-rose-100">
-                         <h2 className="text-sm font-semibold" style={{ color: '#2B578A' }}>文字起こし（リアルタイム）</h2>
+                         <h2 className="text-sm" style={{ color: '#2B578A' }}>文字起こし（リアルタイム）</h2>
                          <div className="mt-2 min-h-[44px] rounded-lg bg-rose-50 px-3 py-2" style={{ color: '#2B578A' }}>
                              {liveText ? liveText : <span style={{ color: '#2B578A' }}>（発話待機中）</span>}
             </div>
@@ -259,7 +259,7 @@ export default function RecorderClient() {
             aria-label="直近の写真プレビュー"
             className="rounded-2xl bg-white p-2 shadow-sm ring-1 ring-rose-100"
           >
-                         <h2 className="text-sm font-semibold" style={{ color: '#2B578A' }}>直近の写真プレビュー</h2>
+                         <h2 className="text-sm" style={{ color: '#2B578A' }}>直近の写真プレビュー</h2>
             <LatestPreview
               apiBase={API_BASE}
               wsRef={wsRef}
@@ -289,6 +289,56 @@ export default function RecorderClient() {
             onStatusChange={(s, d) => console.log("[Speech]", s, d ?? "")}
             cooldownMs={5000}
           />
+
+                     {/* ナビゲーションボタン */}
+           <section className="mt-6">
+             <div className="grid grid-cols-3 gap-3">
+               {/* 車外カメラボタン */}
+               <button
+                 onClick={() => router.push('/shooter')}
+                 className="w-full rounded-xl bg-white p-3 hover:shadow-lg transition-shadow cursor-pointer ring-1 ring-blue-200"
+               >
+                 <div className="flex flex-col items-center justify-center gap-2">
+                   <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: '#5BD3CB' }}>
+                     <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                     </svg>
+                   </div>
+                   <span className="text-xs" style={{ color: '#2B578A' }}>車外カメラ</span>
+                 </div>
+               </button>
+
+               {/* アルバムボタン */}
+               <button
+                 onClick={() => router.push('/album')}
+                 className="w-full rounded-xl bg-white p-3 hover:shadow-lg transition-shadow cursor-pointer ring-1 ring-blue-200"
+               >
+                 <div className="flex flex-col items-center justify-center gap-2">
+                   <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: '#FCF98B' }}>
+                     <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                     </svg>
+                   </div>
+                   <span className="text-xs" style={{ color: '#2B578A' }}>アルバム</span>
+                 </div>
+               </button>
+
+               {/* 戻るボタン */}
+               <button
+                 onClick={() => router.push('/room')}
+                 className="w-full rounded-xl bg-white p-3 hover:shadow-lg transition-shadow cursor-pointer ring-1 ring-blue-200"
+               >
+                 <div className="flex flex-col items-center justify-center gap-2">
+                   <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: '#2B578A' }}>
+                     <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                     </svg>
+                   </div>
+                   <span className="text-xs" style={{ color: '#2B578A' }}>戻る</span>
+                 </div>
+               </button>
+             </div>
+           </section>
         </div>
       )}
     </main>

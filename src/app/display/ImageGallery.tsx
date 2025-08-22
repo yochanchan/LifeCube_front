@@ -94,7 +94,7 @@ export default function ImageGallery({ apiBase, accountId }: ImageGalleryProps) 
   if (loading) {
     return (
       <div className="space-y-4">
-        <h2 className="text-lg font-semibold text-orange-700">最新画像</h2>
+        <h2 className="text-lg text-orange-700">最新画像</h2>
         <div className="flex justify-center py-8">
           <div className="rounded-lg bg-orange-50 p-4 text-orange-600">
             読み込み中...
@@ -107,7 +107,7 @@ export default function ImageGallery({ apiBase, accountId }: ImageGalleryProps) 
   if (error) {
     return (
       <div className="space-y-4">
-        <h2 className="text-lg font-semibold text-orange-700">最新画像</h2>
+        <h2 className="text-lg text-orange-700">最新画像</h2>
         <div className="rounded-lg bg-red-50 p-4 text-red-600">
           エラー: {error}
         </div>
@@ -118,7 +118,7 @@ export default function ImageGallery({ apiBase, accountId }: ImageGalleryProps) 
   if (!picture) {
     return (
       <div className="space-y-4">
-        <h2 className="text-lg font-semibold text-orange-700">最新画像</h2>
+        <h2 className="text-lg text-orange-700">最新画像</h2>
         <div className="rounded-lg bg-orange-50 p-8 text-center text-orange-600">
           <p className="text-lg">最新の画像はありません</p>
         </div>
@@ -128,7 +128,7 @@ export default function ImageGallery({ apiBase, accountId }: ImageGalleryProps) 
 
   return (
     <div className="space-y-4">
-      <h2 className="text-lg font-semibold text-orange-700">最新画像</h2>
+      <h2 className="text-lg text-orange-700">最新画像</h2>
       
       <div className="max-w-2xl mx-auto">
         <div className="bg-white rounded-xl shadow-sm ring-1 ring-orange-100 overflow-hidden">
@@ -144,7 +144,7 @@ export default function ImageGallery({ apiBase, accountId }: ImageGalleryProps) 
           {/* 画像情報 */}
           <div className="p-6 space-y-4">
             <div className="flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-orange-800">
+              <h3 className="text-lg text-orange-800">
                 画像ID: {picture.picture_id}
               </h3>
               <span className="rounded-full bg-orange-100 px-3 py-1 text-sm text-orange-700">
@@ -154,18 +154,18 @@ export default function ImageGallery({ apiBase, accountId }: ImageGalleryProps) 
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-orange-600">
               <div>
-                <span className="font-medium">撮影日時:</span>
+                <span className="">撮影日時:</span>
                 <div className="mt-1">{formatDateTime(picture.pictured_at)}</div>
               </div>
               <div>
-                <span className="font-medium">ファイルサイズ:</span>
+                <span className="">ファイルサイズ:</span>
                 <div className="mt-1">{formatFileSize(picture.image_size)}</div>
               </div>
             </div>
             
             {picture.speech && (
               <div>
-                <span className="font-medium text-orange-700">音声認識結果:</span>
+                <span className="text-orange-700">音声認識結果:</span>
                 <div className="mt-1 p-3 bg-orange-50 rounded-lg text-orange-800">
                   {picture.speech}
                 </div>
@@ -175,7 +175,7 @@ export default function ImageGallery({ apiBase, accountId }: ImageGalleryProps) 
             {/* 編集ボタン */}
             <div className="pt-4 border-t border-orange-100">
               <button
-                className="w-full bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg transition-colors font-medium"
+                className="w-full bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg transition-colors"
                 onClick={() => {
                   alert('編集機能は現在開発中です');
                 }}

@@ -83,7 +83,7 @@ export default function ImageModal({ picture, apiBase, onClose }: ImageModalProp
       <div className="relative max-h-[90vh] max-w-[90vw] overflow-auto rounded-2xl bg-white shadow-2xl">
         {/* ヘッダー */}
         <div className="sticky top-0 flex items-center justify-between border-b border-gray-200 bg-white p-4">
-          <h3 className="text-lg font-semibold text-rose-800">
+          <h3 className="text-lg text-rose-800">
             画像詳細 - ID: {picture.picture_id}
           </h3>
           <button
@@ -134,11 +134,11 @@ export default function ImageModal({ picture, apiBase, onClose }: ImageModalProp
 
             {/* 詳細情報 */}
             <div className="space-y-4">
-              <h4 className="text-lg font-semibold text-rose-700">画像情報</h4>
+              <h4 className="text-lg text-rose-700">画像情報</h4>
               
               <div className="space-y-3">
                 <div className="rounded-lg bg-gray-50 p-3">
-                  <div className="text-sm font-medium text-gray-700">基本情報</div>
+                  <div className="text-sm text-gray-700">基本情報</div>
                   <div className="mt-2 space-y-1 text-sm text-gray-600">
                     <div>画像ID: {picture.picture_id}</div>
                     <div>アカウントID: {picture.account_id}</div>
@@ -147,7 +147,7 @@ export default function ImageModal({ picture, apiBase, onClose }: ImageModalProp
                 </div>
 
                 <div className="rounded-lg bg-gray-50 p-3">
-                  <div className="text-sm font-medium text-gray-700">撮影情報</div>
+                  <div className="text-sm text-gray-700">撮影情報</div>
                   <div className="mt-2 space-y-1 text-sm text-gray-600">
                     <div>撮影日時: {formatDateTime(picture.pictured_at)}</div>
                     <div>デバイス: {picture.device_id || '不明'}</div>
@@ -158,7 +158,7 @@ export default function ImageModal({ picture, apiBase, onClose }: ImageModalProp
                 </div>
 
                 <div className="rounded-lg bg-gray-50 p-3">
-                  <div className="text-sm font-medium text-gray-700">ファイル情報</div>
+                  <div className="text-sm text-gray-700">ファイル情報</div>
                   <div className="mt-2 space-y-1 text-sm text-gray-600">
                     <div>ファイルサイズ: {formatFileSize(picture.image_size)}</div>
                     <div>コンテンツタイプ: {picture.content_type}</div>
@@ -172,27 +172,27 @@ export default function ImageModal({ picture, apiBase, onClose }: ImageModalProp
 
                 {picture.speech && (
                   <div className="rounded-lg bg-gray-50 p-3">
-                    <div className="text-sm font-medium text-gray-700">音声認識結果</div>
+                    <div className="text-sm text-gray-700">音声認識結果</div>
                     <div className="mt-2 text-sm text-gray-600">{picture.speech}</div>
                   </div>
                 )}
 
                 {picture.situation_for_quiz && (
                   <div className="rounded-lg bg-gray-50 p-3">
-                    <div className="text-sm font-medium text-gray-700">状況説明</div>
+                    <div className="text-sm text-gray-700">状況説明</div>
                     <div className="mt-2 text-sm text-gray-600">{picture.situation_for_quiz}</div>
                   </div>
                 )}
 
                 {picture.user_comment && (
                   <div className="rounded-lg bg-gray-50 p-3">
-                    <div className="text-sm font-medium text-gray-700">ユーザーコメント</div>
+                    <div className="text-sm text-gray-700">ユーザーコメント</div>
                     <div className="mt-2 text-sm text-gray-600">{picture.user_comment}</div>
                   </div>
                 )}
 
                 <div className="rounded-lg bg-gray-50 p-3">
-                  <div className="text-sm font-medium text-gray-700">システム情報</div>
+                  <div className="text-sm text-gray-700">システム情報</div>
                   <div className="mt-2 space-y-1 text-sm text-gray-600">
                     <div>作成日時: {formatDateTime(picture.created_at)}</div>
                   </div>

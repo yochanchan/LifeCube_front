@@ -2,6 +2,23 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Zen Maru Gothicフォントの定義 */
+@font-face {
+  font-family: 'Zen Maru Gothic';
+  src: url('/fonts/ZenMaruGothic-Regular.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Zen Maru Gothic';
+  src: url('/fonts/ZenMaruGothic-Bold.ttf') format('truetype');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
 :root {
   --background: #ffffff;
   --foreground: #171717;
@@ -25,5 +42,7 @@
 body {
   color: var(--foreground);
   background: var(--background);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: 'Zen Maru Gothic', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+  font-weight: 700;
+  font-display: swap;
 }

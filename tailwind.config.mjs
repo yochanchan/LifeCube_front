@@ -11,6 +11,14 @@ export default {
         background: "var(--background)",
         foreground: "var(--foreground)",
       },
+      fontFamily: {
+        'zen-maru': ['Zen Maru Gothic', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', 'Meiryo', 'sans-serif'],
+        'sans': ['Zen Maru Gothic', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', 'Meiryo', 'sans-serif'],
+      },
+      fontWeight: {
+        'default': '700',
+        'bold': '700',
+      },
     },
   },
   plugins: [],
