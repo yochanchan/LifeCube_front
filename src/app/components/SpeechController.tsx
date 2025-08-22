@@ -35,7 +35,6 @@ function normalizeJa(s: string): string {
 function matchKeyword(text: string): string | null {
   const t = normalizeJa(text);
   const rules: { keyword: string; re: RegExp }[] = [
-    { keyword: "とる/撮る", re: /(と|とっ|とれ|とる|とって)/ },
     { keyword: "とる/撮る", re: /(とっ|とれ|とる|とって|取って|撮って|取る|撮る)/ },
     { keyword: "シャッター", re: /(しゃった)/ },
     { keyword: "写真/撮影", re: /(しゃしん|さつえい)/ },
