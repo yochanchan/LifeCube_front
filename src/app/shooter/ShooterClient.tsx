@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import CameraPreview from "../components/CameraPreview";
 import { useRoomSocket } from "../../hooks/useRoomSocket";
 import LatestPreview from "../components/LatestPreview";
+import { apiclient } from "@/lib/apiclient";
 
 const API_BASE = (process.env.NEXT_PUBLIC_API_ENDPOINT ?? "").replace(/\/+$/, "");
 const WS_BASE = process.env.NEXT_PUBLIC_WS_URL ?? "";
@@ -45,12 +46,7 @@ export default function ShooterClient() {
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch(`${API_BASE}/auth/me`, {
-          credentials: "include",
-          cache: "no-store",
-        });
-        if (!res.ok) throw new Error("not authenticated");
-        const j = (await res.json()) as Me;
+        const j = await apiclient.getJSON<Me>("/auth/me");
         if (!cancelled) {
           setMe(j);
           setStatus("準備完了");
