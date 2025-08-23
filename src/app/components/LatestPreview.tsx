@@ -18,8 +18,8 @@ type MsgPhotoUploaded = {
   seq?: number;            // ← 無い場合もあるので後述で補完
   picture_id: number;
   device_id: string;
-  image_url?: string;      // 互換：旧フィールド名
-  image_path?: string;     // 新フィールド名
+  image_url?: string;      // 互換：旧フィールド名（絶対URLの可能性）
+  image_path?: string;     // 新フィールド名（相対パス推奨）
   pictured_at?: string;
 };
 
@@ -32,6 +32,24 @@ type LatestPreviewProps = {
   debounceMs?: number;
   wsReady?: WebSocket["readyState"];
 };
+
+/** 旧 image_url（絶対URL）のとき、apiBase と同一オリジンならパスへ正規化 */
+function normalizeToPath(urlOrPath: string | undefined, apiBase: string): string | null {
+  if (!urlOrPath) return null;
+  if (urlOrPath.startsWith("/")) return urlOrPath; // 既にパス
+  try {
+    const abs = new URL(urlOrPath);
+    const base = new URL(apiBase || "/", window.location.origin);
+    // 同一オリジンのみ採用（そうでないと Authorization が付与できない）
+    if (abs.origin === base.origin) {
+      return `${abs.pathname}${abs.search}${abs.hash}`;
+    }
+    return null; // 別オリジンは捨てる
+  } catch {
+    // 不正URL（例: 相対だが先頭が / じゃない）などは捨てる
+    return null;
+  }
+}
 
 export default function LatestPreview({
   apiBase,
@@ -76,7 +94,7 @@ export default function LatestPreview({
         const pickFrom = (others.length > 0 ? others : values).sort((a, b) => b.seq - a.seq);
         setPreview(pickFrom[0] ?? null);
       } else {
-        // shooter: 自分の最大 seq
+        // shooter: 自分の最大 seq（要件どおり）
         const mine = values.filter((v) => v.device_id === myDeviceId).sort((a, b) => b.seq - a.seq);
         setPreview(mine[0] ?? null);
       }
@@ -94,10 +112,14 @@ export default function LatestPreview({
         if (raw?.type !== "photo_uploaded") return;
 
         const m = raw as MsgPhotoUploaded;
-        const seq = Number.isFinite(m.seq) ? (m.seq as number) :
-          (m.pictured_at ? Date.parse(m.pictured_at) : Date.now()); // ← ✅ 補完
+        const seq = Number.isFinite(m.seq)
+          ? (m.seq as number)
+          : (m.pictured_at ? Date.parse(m.pictured_at) : Date.now()); // ← 補完
 
-        const image_path = m.image_path || m.image_url;
+        // 新旧フィールドを考慮しつつ、絶対URLは apiBase と同一オリジンのときのみパス化
+        const image_path =
+          normalizeToPath(m.image_path, apiBase) ??
+          normalizeToPath(m.image_url, apiBase);
         if (!image_path) return;
 
         const item: PhotoItem = {
@@ -120,7 +142,7 @@ export default function LatestPreview({
 
     ws.addEventListener("message", onMessage);
     return () => ws.removeEventListener("message", onMessage);
-  }, [wsRef, policy, myDeviceId, debounceMs, wsReady]);
+  }, [wsRef, policy, myDeviceId, debounceMs, wsReady, apiBase]);
 
   // ✅ ローカル即時イベントでも反映（WS往復待ちを回避）
   useEffect(() => {
@@ -133,7 +155,9 @@ export default function LatestPreview({
         ? (m.seq as number)
         : (m.pictured_at ? Date.parse(m.pictured_at!) : Date.now());
 
-      const image_path = m.image_path || m.image_url;
+      const image_path =
+        normalizeToPath(m.image_path, apiBase) ??
+        normalizeToPath(m.image_url, apiBase);
       if (!image_path) return;
 
       const item: PhotoItem = {
@@ -153,7 +177,7 @@ export default function LatestPreview({
 
     window.addEventListener("photo_uploaded_local", onLocal as EventListener);
     return () => window.removeEventListener("photo_uploaded_local", onLocal as EventListener);
-  }, [policy, myDeviceId, debounceMs]);
+  }, [policy, myDeviceId, debounceMs, apiBase]);
 
   // プレビュー対象が変わったら、認証付きで Blob 取得 → Object URL を差し替え
   useEffect(() => {
@@ -169,7 +193,7 @@ export default function LatestPreview({
       }
       setLoading(true);
       try {
-        // ✅ Authorization 付きで取得（apiclient 側が Bearer を付与）
+        // Authorization 付きで取得（apiclient 側が Bearer を付与）
         const url = await apiclient.getObjectUrl(preview.image_path);
         if (cancelled) {
           // 生成しちゃったURLは即破棄

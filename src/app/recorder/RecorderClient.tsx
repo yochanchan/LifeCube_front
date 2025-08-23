@@ -57,7 +57,6 @@ export default function RecorderClient() {
 
   const [status, setStatus] = useState("初期化中…");
   const [recActive, setRecActive] = useState(false);
-  const [latestPhotoUrl, setLatestPhotoUrl] = useState<string | null>(null);
 
   // 文字起こしの状態（MicCamera と同等）
   const [liveText, setLiveText] = useState<string>("");
@@ -160,10 +159,6 @@ export default function RecorderClient() {
     },
     [broadcastTakePhoto]
   );
-
-  const handlePhotoChange = (photoUrl: string | null, photoData: any) => {
-    setLatestPhotoUrl(photoUrl);
-  };
 
   // タイマー類のクリーンアップ
   useEffect(() => {
