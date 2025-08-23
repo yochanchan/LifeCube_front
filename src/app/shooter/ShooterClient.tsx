@@ -70,6 +70,12 @@ export default function ShooterClient() {
     room,
     deviceId: myDeviceId,
     pingIntervalMs: 5000,
+    onMessage: (msg) => {
+      if (msg?.type === "take_photo" && (msg as any).origin_device_id !== myDeviceId) {
+        // 他端末からのトリガーだけ拾う
+        window.dispatchEvent(new Event("app:take_photo"));
+      }
+    },
   });
 
   // SHOOTER として join
