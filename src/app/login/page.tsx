@@ -4,10 +4,10 @@
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import LoginUI from "./UI";
+import { apiclient, type LoginResponse } from "@/lib/apiclient";
 
 /** APIベースURL（末尾の / を除去） */
-const API_BASE_RAW = process.env.NEXT_PUBLIC_API_ENDPOINT;
-const API_BASE = (API_BASE_RAW ?? "").replace(/\/+$/, "");
+const API_BASE = (process.env.NEXT_PUBLIC_API_ENDPOINT ?? "").replace(/\/+$/, "");
 
 /** JSONを安全に読む小ヘルパ（失敗時は null） */
 async function readJson<T>(res: Response): Promise<T | null> {
@@ -36,8 +36,7 @@ export default function AuthPage() {
     try {
       const res = await fetch(`${API_BASE}/auth/${action}`, {
         method: "POST",
-        credentials: "include", // ← Cookie を受け取る/送るのに必須
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
         body: JSON.stringify({
           email: email.trim().toLowerCase(),
           password,
@@ -56,6 +55,23 @@ export default function AuthPage() {
         throw new Error(msg);
       }
 
+      // 成功時：バックエンドの形式（/auth/login と /auth/signup は同形式）
+      const j = (await readJson<LoginResponse>(res)) as LoginResponse | null;
+
+      if (!j?.access_token || typeof j.expires_in !== "number") {
+        throw new Error("トークンの取得に失敗しました");
+      }
+
+      // apiclient に渡して、適切なキー＋メモリへ保存
+      apiclient.setTokens(j);
+
+      // （任意）jti を必要なら保存
+      if (j.jti) {
+        try {
+          localStorage.setItem("auth.jti", j.jti);
+        } catch { }
+      }
+
       // 成功 → roomページ へ
       router.push("/room");
     } catch (e: any) {
@@ -65,7 +81,7 @@ export default function AuthPage() {
     }
   };
 
-  // Enter キーで「ログイン」実行（好みで変更可）
+  // Enter キーで「ログイン」実行
   const onSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!loading) submit("login");

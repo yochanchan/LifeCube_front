@@ -1,3 +1,4 @@
+// app/login/UI.tsx
 "use client";
 
 import React, { useState } from "react";
@@ -60,7 +61,7 @@ export default function LoginUI({
                   id="email"
                   placeholder="example@honda.com"
                   className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-opacity-50"
-                  style={{ 
+                  style={{
                     borderColor: '#2B578A',
                     '--tw-ring-color': '#2B578A'
                   } as React.CSSProperties}
@@ -82,7 +83,7 @@ export default function LoginUI({
                     autoComplete="current-password"
                     id="password"
                     className="w-full px-3 py-2 pr-10 border rounded-lg focus:outline-none focus:ring-2 focus:ring-opacity-50"
-                    style={{ 
+                    style={{
                       borderColor: '#2B578A',
                       '--tw-ring-color': '#2B578A'
                     } as React.CSSProperties}
@@ -122,7 +123,7 @@ export default function LoginUI({
                 type="submit"
                 disabled={loading !== null}
                 className="w-full text-white py-3 px-4 rounded-lg transition-colors"
-                style={{ 
+                style={{
                   backgroundColor: loading === "login" ? '#9CA3AF' : '#2B578A',
                   opacity: loading !== null ? 0.7 : 1
                 }}
@@ -136,7 +137,7 @@ export default function LoginUI({
                 disabled={loading !== null}
                 onClick={onSignup}
                 className="w-full text-white py-3 px-4 rounded-lg transition-colors"
-                style={{ 
+                style={{
                   backgroundColor: loading === "signup" ? '#9CA3AF' : '#2B578A',
                   opacity: loading !== null ? 0.7 : 1
                 }}

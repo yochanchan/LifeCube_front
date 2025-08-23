@@ -3,9 +3,10 @@
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { safeSend } from "../../lib/ws";
+import { apiclient } from "@/lib/apiclient";
 
 type Props = {
-  apiBase: string;
+  apiBase: string; // 互換のため残置（未使用）
   wsRef: React.MutableRefObject<WebSocket | null>;
   myDeviceId: string;
   /** あればこちらを優先して送信。無ければ safeSend(wsRef.current, ...) にフォールバック */
@@ -17,7 +18,7 @@ type Props = {
 type UploadResp = {
   picture_id: number;
   thumbnail_path: string;
-  image_path?: string | null;     // ★ 追加：フル画像URL（相対）
+  image_path?: string | null;
   pictured_at?: string | null;
   device_id?: string | null;
 };
@@ -62,7 +63,6 @@ export default function CameraPreview({ apiBase, wsRef, myDeviceId, sendJson, ch
     };
   }, []);
 
-  // WS 送信用の小ヘルパ
   const sendWs = useCallback(
     (payload: unknown) => {
       if (typeof sendJson === "function") {
@@ -70,7 +70,7 @@ export default function CameraPreview({ apiBase, wsRef, myDeviceId, sendJson, ch
           const r = sendJson(payload);
           return typeof r === "boolean" ? r : true;
         } catch {
-          // フォールバック
+          /* fallback */
         }
       }
       return safeSend(wsRef.current, payload);
@@ -105,33 +105,26 @@ export default function CameraPreview({ apiBase, wsRef, myDeviceId, sendJson, ch
 
       const fd = new FormData();
       fd.append("file", blob, `snap_${Date.now()}.jpg`);
-      // 任意: device_id を送りたい場合（サーバ側が無視してもOK）
       fd.append("device_id", myDeviceId);
 
-      const res = await fetch(`${apiBase}/api/pictures`, {
-        method: "POST",
-        body: fd,
-        credentials: "include",
-      });
+      // ✅ Authorization 自動付与（Bearer）
+      const j = await apiclient.postForm<UploadResp>("/api/pictures", fd);
 
-      if (!res.ok) {
-        const text = await res.text().catch(() => "");
-        throw new Error(`アップロード失敗: ${res.status} ${res.statusText} ${text}`);
-      }
-
-      const j = (await res.json()) as UploadResp;
-
-      // ✅ フル画像URL（相対）を優先。無ければ保険で自前組み立て。
+      // image_path が無い場合もフォールバックで組み立て
       const imagePath = j.image_path ?? `/api/pictures/${j.picture_id}/image`;
-
-      // ✅ フェーズ0要件：アップロード直後に WS で photo_uploaded を送る（フル画像を指す image_url）
       const payload = {
         type: "photo_uploaded",
         picture_id: j.picture_id,
         device_id: myDeviceId,
-        image_url: imagePath, // 例: "/api/pictures/123/image"
+        image_url: imagePath, // LatestPreview は image_url を読む
         pictured_at: j.pictured_at ?? new Date().toISOString(),
+        seq: Date.now(),      // ✅ 最新選定用に必須
       };
+
+      // ✅ 即時ローカル通知（WS往復を待たずプレビュー反映）
+      window.dispatchEvent(new CustomEvent("photo_uploaded_local", { detail: payload }));
+
+      // ✅ 共有のためWSにも送る（サーバ側からも同種が流れてくるなら二重でもOK）
       sendWs(payload);
 
       setMsg("アップロードしました");
@@ -141,7 +134,7 @@ export default function CameraPreview({ apiBase, wsRef, myDeviceId, sendJson, ch
     } finally {
       setBusy(false);
     }
-  }, [apiBase, myDeviceId, busy, sendWs]);
+  }, [busy, myDeviceId, sendWs]);
 
   // ローカルイベント → 撮影
   useEffect(() => {
@@ -198,7 +191,6 @@ export default function CameraPreview({ apiBase, wsRef, myDeviceId, sendJson, ch
         {msg && <span className="text-sm text-rose-700">{msg}</span>}
       </div>
 
-      {/* 非表示の描画用キャンバス */}
       <canvas ref={canvasRef} className="hidden" />
     </div>
   );

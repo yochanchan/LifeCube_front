@@ -2,6 +2,7 @@
 "use client";
 
 import React, { useState } from "react";
+import AuthImage from "@/app/components/AuthImage";
 
 export type PictureMeta = {
   picture_id: number;
@@ -18,16 +19,12 @@ export type PictureMeta = {
   image_size: number;
   sha256_hex: string | null;
   created_at: string;
-  thumbnail_path?: string;
+  thumbnail_path?: string; // 例: /api/pictures/{id}/thumbnail?w=256
 };
 
 /* ───────────────────────────────────────────────────────────
    定数・ユーティリティ
    ─────────────────────────────────────────────────────────── */
-
-/** API ベースURL（末尾の / を除去） */
-const API_BASE_RAW = process.env.NEXT_PUBLIC_API_ENDPOINT;
-const API_BASE = (API_BASE_RAW ?? "").replace(/\/+$/, "");
 
 /** サムネイル幅のデフォルト値 */
 const DEFAULT_THUMB_W = 256;
@@ -46,32 +43,30 @@ export function formatJP(dateStr: string): string {
 export function formatDate(dateStr: string): string {
   try {
     const [y, m, d] = dateStr.split("-").map(Number);
-    return `${y}.${m.toString().padStart(2, '0')}.${d.toString().padStart(2, '0')}`;
+    return `${y}.${m.toString().padStart(2, "0")}.${d.toString().padStart(2, "0")}`;
   } catch {
     return dateStr;
   }
 }
 
 /* ───────────────────────────────────────────────────────────
-   エンドポイント
+   エンドポイント（パスのみを返す）
    ─────────────────────────────────────────────────────────── */
-
 export const endpoints = {
   dates: (tripId?: string | null) => {
     const params = new URLSearchParams();
     if (tripId) params.set("trip_id", tripId);
     const q = params.toString();
-    return `${API_BASE}/api/pictures/dates${q ? `?${q}` : ""}`;
+    return `/api/pictures/dates${q ? `?${q}` : ""}`;
   },
   byDate: (date: string, tripId?: string | null, thumbW: number = DEFAULT_THUMB_W) => {
     const params = new URLSearchParams({ date, thumb_w: String(thumbW) });
     if (tripId) params.set("trip_id", tripId);
-    return `${API_BASE}/api/pictures/by-date?${params.toString()}`;
+    return `/api/pictures/by-date?${params.toString()}`;
   },
-  image: (id: number) => `${API_BASE}/api/pictures/${id}/image`,
-  thumb: (id: number, w: number = DEFAULT_THUMB_W) =>
-    `${API_BASE}/api/pictures/${id}/thumbnail?w=${w}`,
-  deletePicture: (id: number) => `${API_BASE}/api/pictures/${id}`,
+  image: (id: number) => `/api/pictures/${id}/image`,
+  thumb: (id: number, w: number = DEFAULT_THUMB_W) => `/api/pictures/${id}/thumbnail?w=${w}`,
+  deletePicture: (id: number) => `/api/pictures/${id}`,
 };
 
 /* ───────────────────────────────────────────────────────────
@@ -91,14 +86,12 @@ export function DateChips({
   selected: string | null;
   onSelect: (d: string) => void;
 }) {
-  // Hooksを最上位で呼び出し
   const [selectedYear, setSelectedYear] = useState<string | null>(null);
   const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
 
-  // 選択された日付から年と月を取得
   React.useEffect(() => {
     if (selected) {
-      const [year, month] = selected.split('-');
+      const [year, month] = selected.split("-");
       setSelectedYear(year);
       setSelectedMonth(month);
     }
@@ -108,22 +101,18 @@ export function DateChips({
   if (error) return <ErrorBanner text={`エラー: ${error}`} />;
   if (!dates || dates.length === 0) return <EmptyBanner text="まだ写真がありません。" />;
 
-  // 日付を年、月、日付でグループ化
   const groupedDates = dates.reduce((acc, date) => {
-    const [year, month, day] = date.split('-');
-    if (!acc[year]) {
-      acc[year] = {};
-    }
-    if (!acc[year][month]) {
-      acc[year][month] = [];
-    }
+    const [year, month, day] = date.split("-");
+    if (!acc[year]) acc[year] = {};
+    if (!acc[year][month]) acc[year][month] = [];
     acc[year][month].push(day);
     return acc;
   }, {} as Record<string, Record<string, string[]>>);
 
   const years = Object.keys(groupedDates).sort((a, b) => Number(b) - Number(a));
   const months = selectedYear ? Object.keys(groupedDates[selectedYear]).sort((a, b) => Number(a) - Number(b)) : [];
-  const days = selectedYear && selectedMonth ? groupedDates[selectedYear][selectedMonth].sort((a, b) => Number(a) - Number(b)) : [];
+  const days =
+    selectedYear && selectedMonth ? groupedDates[selectedYear][selectedMonth].sort((a, b) => Number(a) - Number(b)) : [];
 
   return (
     <div className="mt-3 space-y-3">
@@ -138,13 +127,11 @@ export function DateChips({
             }}
             className={
               "whitespace-nowrap rounded-full px-4 py-2 text-sm transition-all " +
-              (selectedYear === year
-                ? "shadow-md"
-                : "bg-white ring-1 ring-blue-200 hover:bg-blue-50")
+              (selectedYear === year ? "shadow-md" : "bg-white ring-1 ring-blue-200 hover:bg-blue-50")
             }
-            style={{ 
-              color: selectedYear === year ? '#FFFFFF' : '#2B578A',
-              backgroundColor: selectedYear === year ? '#2B578A' : undefined
+            style={{
+              color: selectedYear === year ? "#FFFFFF" : "#2B578A",
+              backgroundColor: selectedYear === year ? "#2B578A" : undefined,
             }}
             aria-pressed={selectedYear === year}
             title={`${year}年`}
@@ -163,13 +150,11 @@ export function DateChips({
               onClick={() => setSelectedMonth(month)}
               className={
                 "whitespace-nowrap rounded-full px-4 py-2 text-sm transition-all " +
-                (selectedMonth === month
-                  ? "shadow-md"
-                  : "bg-white ring-1 ring-blue-200 hover:bg-blue-50")
+                (selectedMonth === month ? "shadow-md" : "bg-white ring-1 ring-blue-200 hover:bg-blue-50")
               }
-              style={{ 
-                color: selectedMonth === month ? '#FFFFFF' : '#2B578A',
-                backgroundColor: selectedMonth === month ? '#2B578A' : undefined
+              style={{
+                color: selectedMonth === month ? "#FFFFFF" : "#2B578A",
+                backgroundColor: selectedMonth === month ? "#2B578A" : undefined,
               }}
               aria-pressed={selectedMonth === month}
               title={`${month}月`}
@@ -192,13 +177,11 @@ export function DateChips({
                 onClick={() => onSelect(fullDate)}
                 className={
                   "whitespace-nowrap rounded-full px-4 py-2 text-sm transition-all " +
-                  (active
-                    ? "shadow-md"
-                    : "bg-white ring-1 ring-blue-200 hover:bg-blue-50")
+                  (active ? "shadow-md" : "bg-white ring-1 ring-blue-200 hover:bg-blue-50")
                 }
-                style={{ 
-                  color: active ? '#FFFFFF' : '#2B578A',
-                  backgroundColor: active ? '#2B578A' : undefined
+                style={{
+                  color: active ? "#FFFFFF" : "#2B578A",
+                  backgroundColor: active ? "#2B578A" : undefined,
                 }}
                 aria-pressed={active}
                 title={formatJP(fullDate)}
@@ -237,27 +220,19 @@ export function PicturesGrid({
 
   const togglePictureSelection = (pictureId: number) => {
     const newSelected = new Set(selectedPictures);
-    if (newSelected.has(pictureId)) {
-      newSelected.delete(pictureId);
-    } else {
-      newSelected.add(pictureId);
-    }
+    if (newSelected.has(pictureId)) newSelected.delete(pictureId);
+    else newSelected.add(pictureId);
     setSelectedPictures(newSelected);
   };
 
   const toggleAllSelection = () => {
-    if (selectedPictures.size === items.length) {
-      setSelectedPictures(new Set());
-    } else {
-      setSelectedPictures(new Set(items.map(p => p.picture_id)));
-    }
+    if (selectedPictures.size === items.length) setSelectedPictures(new Set());
+    else setSelectedPictures(new Set(items.map((p) => p.picture_id)));
   };
 
   const toggleSelectMode = () => {
     setIsSelectMode(!isSelectMode);
-    if (isSelectMode) {
-      setSelectedPictures(new Set());
-    }
+    if (isSelectMode) setSelectedPictures(new Set());
   };
 
   const handleDelete = () => {
@@ -275,27 +250,19 @@ export function PicturesGrid({
         <div className="flex items-center gap-3">
           <button
             onClick={toggleSelectMode}
-            className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-              isSelectMode 
-                ? "bg-blue-600 text-white" 
-                : "bg-white text-blue-700 ring-1 ring-blue-200 hover:bg-blue-50"
-            }`}
+            className={`px-4 py-2 rounded-lg font-medium transition-colors ${isSelectMode ? "bg-blue-600 text-white" : "bg-white text-blue-700 ring-1 ring-blue-200 hover:bg-blue-50"
+              }`}
           >
             {isSelectMode ? "選択モード終了" : "写真を選択"}
           </button>
-          
+
           {isSelectMode && (
             <>
-              <button
-                onClick={toggleAllSelection}
-                className="px-3 py-2 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
-              >
+              <button onClick={toggleAllSelection} className="px-3 py-2 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200">
                 {selectedPictures.size === items.length ? "全選択解除" : "全選択"}
               </button>
-              
-              <span className="text-sm text-gray-600">
-                選択中: {selectedPictures.size} / {items.length}
-              </span>
+
+              <span className="text-sm text-gray-600">選択中: {selectedPictures.size} / {items.length}</span>
             </>
           )}
         </div>
@@ -342,33 +309,26 @@ function PictureItem({
   isSelected: boolean;
   onToggleSelection: (pictureId: number) => void;
 }) {
-  const thumbSrc = picture.thumbnail_path
-    ? `${API_BASE}${picture.thumbnail_path.startsWith("/") ? "" : ""}${picture.thumbnail_path}`
-    : endpoints.thumb(picture.picture_id, DEFAULT_THUMB_W);
+  // サムネはパスのみで渡す
+  const thumbPath = picture.thumbnail_path ?? endpoints.thumb(picture.picture_id, DEFAULT_THUMB_W);
 
   return (
     <figure className="group relative overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-blue-100 aspect-square cursor-pointer">
-      <div
-        onClick={() => onPictureClick(picture)}
-        className="block h-full"
-      >
-        <img
-          src={thumbSrc}
+      <div onClick={() => onPictureClick(picture)} className="block h-full">
+        <AuthImage
+          path={thumbPath}
           alt={picture.user_comment ?? picture.situation_for_quiz ?? picture.pictured_at}
           className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-          loading="lazy"
-          decoding="async"
         />
       </div>
       {isSelectMode && (
         <div
-          className={`absolute top-2 left-2 w-6 h-6 rounded-full transition-all duration-200 cursor-pointer ${
-            isSelected
+          className={`absolute top-2 left-2 w-6 h-6 rounded-full transition-all duration-200 cursor-pointer ${isSelected
               ? "bg-red-500 text-white shadow-lg scale-110"
               : "bg-white text-gray-400 ring-2 ring-gray-300 hover:ring-blue-400 hover:text-blue-500"
-          }`}
+            }`}
           onClick={(e) => {
-            e.stopPropagation(); // クリックイベントを親要素に伝播させない
+            e.stopPropagation();
             onToggleSelection(picture.picture_id);
           }}
           aria-label={isSelected ? "選択解除" : "選択"}
@@ -391,7 +351,7 @@ function PictureItem({
 }
 
 /* ───────────────────────────────────────────────────────────
-   UI 小コンポーネント
+   UI 小コンポーネント（そのまま）
    ─────────────────────────────────────────────────────────── */
 
 function SkeletonChips() {
