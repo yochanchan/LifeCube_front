@@ -36,7 +36,6 @@ export default function ShooterClient() {
   const authReady = authChecked && !!me;
 
   const [status, setStatus] = useState("初期化中…");
-  const [latestPhotoUrl, setLatestPhotoUrl] = useState<string | null>(null);
 
   const myDeviceId = useMemo(getOrCreateDeviceId, []);
   const room = me ? `acc:${me.account_id}` : null;
@@ -107,10 +106,6 @@ export default function ShooterClient() {
     // 手動撮影（CameraPreview 内のイベントに委ねる）
     window.dispatchEvent(new Event("app:take_photo"));
   }, []);
-
-  const handlePhotoChange = (photoUrl: string | null, photoData: any) => {
-    setLatestPhotoUrl(photoUrl);
-  };
 
   return (
     <main className="min-h-screen" style={{ backgroundColor: '#BDD9D7' }}>
