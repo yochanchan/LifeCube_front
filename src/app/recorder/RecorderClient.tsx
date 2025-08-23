@@ -8,7 +8,6 @@ import SpeechController from "../components/SpeechController";
 import LatestPreview from "../components/LatestPreview";
 import { useRoomSocket } from "../../hooks/useRoomSocket";
 import type { WsMessage } from "../../lib/ws";
-import { apiclient } from "@/lib/apiclient";
 
 const API_BASE = (process.env.NEXT_PUBLIC_API_ENDPOINT ?? "").replace(/\/+$/, "");
 const WS_BASE = process.env.NEXT_PUBLIC_WS_URL ?? "";
@@ -73,7 +72,12 @@ export default function RecorderClient() {
     let cancelled = false;
     (async () => {
       try {
-        const j = await apiclient.getJSON<Me>("/auth/me");
+        const res = await fetch(`${API_BASE}/auth/me`, {
+          credentials: "include",
+          cache: "no-store",
+        });
+        if (!res.ok) throw new Error("not authenticated");
+        const j = (await res.json()) as Me;
         if (!cancelled) {
           setMe(j);
           setStatus("準備完了");
@@ -174,32 +178,26 @@ export default function RecorderClient() {
     roster && `RECORDER ${roster.counts.recorder}/1, SHOOTER ${roster.counts.shooter}/4`;
 
   return (
-    <main className="min-h-screen" style={{ backgroundColor: '#BDD9D7' }}>
+            <main className="min-h-screen" style={{ backgroundColor: '#BDD9D7' }}>
       {!authReady ? (
         <div className="mx-auto max-w-5xl p-4">
-          <div className="rounded-xl bg-white/80 p-4 ring-1 ring-rose-100" style={{ color: '#2B578A' }}>{status}</div>
+                       <div className="rounded-xl bg-white/80 p-4 ring-1 ring-rose-100" style={{ color: '#2B578A' }}>{status}</div>
         </div>
       ) : (
         <div className="mx-auto max-w-md p-4 space-y-4 sm:max-w-lg">
           {/* ヘッダ */}
-          <header className="rounded-2xl bg-white/70 p-4 shadow-sm ring-1 ring-rose-100">
-            <div className="flex flex-wrap items-center gap-2">
-              <h1 className="text-xl" style={{ color: '#2B578A' }}>Recorder</h1>
-              <span className="ml-auto rounded-full bg-rose-100 px-2 py-0.5 text-xs" style={{ color: '#2B578A' }}>
-                account_id: <strong>{me?.account_id}</strong>
-              </span>
-              <span className="rounded-full bg-rose-100 px-2 py-0.5 text-xs" style={{ color: '#2B578A' }}>
-                room: <strong>{room}</strong>
-              </span>
+          <header className="p-4">
+            <div className="flex justify-center">
+              <h1 className="text-xl" style={{ color: '#2B578A' }}>HONDAカメラ</h1>
             </div>
 
-            <div className="mt-3 flex items-center gap-2">
+            <div className="mt-3 flex justify-center">
               <button
                 type="button"
                 onClick={() => setRecActive((v) => !v)}
                 disabled={!joinedRole}
                 className={
-                  "rounded-full px-4 py-2 text-white transition " +
+                  "rounded-full px-8 py-4 text-lg font-semibold text-white transition " +
                   (recActive ? "hover:opacity-80" : "hover:opacity-80")
                 }
                 style={{
@@ -210,44 +208,43 @@ export default function RecorderClient() {
               >
                 {recActive ? "■ 録音停止" : "▶ HONDAカメラ始動"}
               </button>
-              <p className="text-sm" style={{ color: '#2B578A' }}>{status}</p>
-              <span className="ml-auto text-xs" style={{ color: '#2B578A' }}>
-                WS: {["CONNECTING", "OPEN", "CLOSING", "CLOSED"][readyState] ?? readyState}
-              </span>
             </div>
-
-            {rosterText && <div className="mt-2 text-xs" style={{ color: '#2B578A' }}>{rosterText}</div>}
           </header>
+
+          {/* 情報表示（カメラカードの上に表示） */}
+          <div className="text-[10px] text-right" style={{ color: '#2B578A' }}>
+            <div>ID:{me?.account_id} Room:{room} {rosterText && rosterText}</div>
+          </div>
 
           {/* 上：カメラ */}
           <section aria-label="カメラ" className="rounded-2xl bg-white p-2 shadow-sm ring-1 ring-rose-100">
-            <CameraPreview apiBase={API_BASE} wsRef={wsRef} myDeviceId={myDeviceId} sendJson={sendJson} />
-          </section>
-
-          {/* 中：文字起こし（← ここを“カメラとプレビューの間”に配置） */}
-          <section aria-label="文字起こし" className="rounded-2xl bg-white/80 p-3 shadow-sm ring-1 ring-rose-100">
-            <h2 className="text-sm" style={{ color: '#2B578A' }}>文字起こし（リアルタイム）</h2>
-            <div className="mt-2 min-h-[44px] rounded-lg bg-rose-50 px-3 py-2" style={{ color: '#2B578A' }}>
-              {liveText ? liveText : <span style={{ color: '#2B578A' }}>（発話待機中）</span>}
-            </div>
-            <div className="mt-3 max-h-60 overflow-y-auto rounded-lg bg-white ring-1 ring-rose-100">
-              {finalLines.length === 0 ? (
-                <div className="p-3 text-sm" style={{ color: '#2B578A' }}>（確定テキストはまだありません）</div>
-              ) : (
-                <ul className="divide-y divide-rose-100">
-                  {finalLines.map((l, i) => (
-                    <li key={l.ts + ":" + i} className="p-3 text-sm" style={{ color: '#2B578A' }}>
-                      {new Date(l.ts).toLocaleTimeString()}：{l.text}
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
+            <CameraPreview apiBase={API_BASE} wsRef={wsRef} myDeviceId={myDeviceId} sendJson={sendJson}>
+              {/* 文字起こし部分（カメラカード内、手動で撮影ボタンの上に表示） */}
+              <div className="rounded-2xl bg-white/80 p-3 shadow-sm ring-1 ring-rose-100">
+                <h2 className="text-sm" style={{ color: '#2B578A' }}>文字起こし（リアルタイム）</h2>
+                <div className="mt-2 min-h-[44px] rounded-lg bg-rose-50 px-3 py-2" style={{ color: '#2B578A' }}>
+                  {liveText ? liveText : <span style={{ color: '#2B578A' }}>（発話待機中）</span>}
+                </div>
+                <div className="mt-3 max-h-60 overflow-y-auto rounded-lg bg-white ring-1 ring-rose-100">
+                  {finalLines.length === 0 ? (
+                    <div className="p-3 text-sm" style={{ color: '#2B578A' }}>（確定テキストはまだありません）</div>
+                  ) : (
+                    <ul className="divide-y divide-rose-100">
+                      {finalLines.map((l, i) => (
+                        <li key={l.ts + ":" + i} className="p-3 text-sm" style={{ color: '#2B578A' }}>
+                          {new Date(l.ts).toLocaleTimeString()}：{l.text}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              </div>
+            </CameraPreview>
           </section>
 
           {/* キーワードで撮影した通知（任意） */}
           {triggerMsg && (
-            <div className="rounded-xl bg-emerald-50 p-3 ring-1 ring-emerald-100" style={{ color: '#2B578A' }}>{triggerMsg}</div>
+                         <div className="rounded-xl bg-emerald-50 p-3 ring-1 ring-emerald-100" style={{ color: '#2B578A' }}>{triggerMsg}</div>
           )}
 
           {/* 下：直近の写真プレビュー（RECORDERポリシー = “自分以外を優先し、seq最大”） */}
@@ -255,7 +252,7 @@ export default function RecorderClient() {
             aria-label="直近の写真プレビュー"
             className="rounded-2xl bg-white p-2 shadow-sm ring-1 ring-rose-100"
           >
-            <h2 className="text-sm" style={{ color: '#2B578A' }}>直近の写真プレビュー</h2>
+                         <h2 className="text-sm" style={{ color: '#2B578A' }}>直近の写真プレビュー</h2>
             <LatestPreview
               apiBase={API_BASE}
               wsRef={wsRef}
@@ -286,55 +283,55 @@ export default function RecorderClient() {
             cooldownMs={5000}
           />
 
-          {/* ナビゲーションボタン */}
-          <section className="mt-6">
-            <div className="grid grid-cols-3 gap-3">
-              {/* 車外カメラボタン */}
-              <button
-                onClick={() => router.push('/shooter')}
-                className="w-full rounded-xl bg-white p-3 hover:shadow-lg transition-shadow cursor-pointer ring-1 ring-blue-200"
-              >
-                <div className="flex flex-col items-center justify-center gap-2">
-                  <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: '#5BD3CB' }}>
-                    <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                    </svg>
-                  </div>
-                  <span className="text-xs" style={{ color: '#2B578A' }}>車外カメラ</span>
-                </div>
-              </button>
+                     {/* ナビゲーションボタン */}
+           <section className="mt-6">
+             <div className="grid grid-cols-3 gap-3">
+               {/* 車外カメラボタン */}
+               <button
+                 onClick={() => router.push('/shooter')}
+                 className="w-full rounded-xl bg-white p-3 hover:shadow-lg transition-shadow cursor-pointer ring-1 ring-blue-200"
+               >
+                 <div className="flex flex-col items-center justify-center gap-2">
+                   <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: '#5BD3CB' }}>
+                     <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                     </svg>
+                   </div>
+                   <span className="text-xs" style={{ color: '#2B578A' }}>車外カメラ</span>
+                 </div>
+               </button>
 
-              {/* アルバムボタン */}
-              <button
-                onClick={() => router.push('/album')}
-                className="w-full rounded-xl bg-white p-3 hover:shadow-lg transition-shadow cursor-pointer ring-1 ring-blue-200"
-              >
-                <div className="flex flex-col items-center justify-center gap-2">
-                  <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: '#FCF98B' }}>
-                    <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                    </svg>
-                  </div>
-                  <span className="text-xs" style={{ color: '#2B578A' }}>アルバム</span>
-                </div>
-              </button>
+               {/* アルバムボタン */}
+               <button
+                 onClick={() => router.push('/album')}
+                 className="w-full rounded-xl bg-white p-3 hover:shadow-lg transition-shadow cursor-pointer ring-1 ring-blue-200"
+               >
+                 <div className="flex flex-col items-center justify-center gap-2">
+                   <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: '#FCF98B' }}>
+                     <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                     </svg>
+                   </div>
+                   <span className="text-xs" style={{ color: '#2B578A' }}>アルバム</span>
+                 </div>
+               </button>
 
-              {/* 戻るボタン */}
-              <button
-                onClick={() => router.push('/room')}
-                className="w-full rounded-xl bg-white p-3 hover:shadow-lg transition-shadow cursor-pointer ring-1 ring-blue-200"
-              >
-                <div className="flex flex-col items-center justify-center gap-2">
-                  <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: '#2B578A' }}>
-                    <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-                    </svg>
-                  </div>
-                  <span className="text-xs" style={{ color: '#2B578A' }}>戻る</span>
-                </div>
-              </button>
-            </div>
-          </section>
+               {/* 戻るボタン */}
+               <button
+                 onClick={() => router.push('/room')}
+                 className="w-full rounded-xl bg-white p-3 hover:shadow-lg transition-shadow cursor-pointer ring-1 ring-blue-200"
+               >
+                 <div className="flex flex-col items-center justify-center gap-2">
+                   <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: '#2B578A' }}>
+                     <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                     </svg>
+                   </div>
+                   <span className="text-xs" style={{ color: '#2B578A' }}>戻る</span>
+                 </div>
+               </button>
+             </div>
+           </section>
         </div>
       )}
     </main>

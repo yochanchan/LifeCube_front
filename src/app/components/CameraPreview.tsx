@@ -11,6 +11,8 @@ type Props = {
   myDeviceId: string;
   /** あればこちらを優先して送信。無ければ safeSend(wsRef.current, ...) にフォールバック */
   sendJson?: (msg: unknown) => boolean | void;
+  /** 文字起こし部分の表示 */
+  children?: React.ReactNode;
 };
 
 type UploadResp = {
@@ -21,7 +23,7 @@ type UploadResp = {
   device_id?: string | null;
 };
 
-export default function CameraPreview({ apiBase, wsRef, myDeviceId, sendJson }: Props) {
+export default function CameraPreview({ apiBase, wsRef, myDeviceId, sendJson, children }: Props) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -170,6 +172,9 @@ export default function CameraPreview({ apiBase, wsRef, myDeviceId, sendJson }: 
       <div className="overflow-hidden rounded-2xl bg-black shadow ring-1 ring-rose-200">
         <video ref={videoRef} playsInline muted autoPlay className="aspect-video w-full object-cover" />
       </div>
+
+      {/* 文字起こし部分 */}
+      {children}
 
       <div className="flex items-center gap-2">
         <button
