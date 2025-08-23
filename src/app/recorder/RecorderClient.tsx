@@ -186,67 +186,60 @@ export default function RecorderClient() {
       ) : (
         <div className="mx-auto max-w-md p-4 space-y-4 sm:max-w-lg">
           {/* ヘッダ */}
-          <header className="rounded-2xl bg-white/70 p-4 shadow-sm ring-1 ring-rose-100">
-            <div className="flex flex-wrap items-center gap-2">
-              <h1 className="text-xl" style={{ color: '#2B578A' }}>Recorder</h1>
-                             <span className="ml-auto rounded-full bg-rose-100 px-2 py-0.5 text-xs" style={{ color: '#2B578A' }}>
-                account_id: <strong>{me?.account_id}</strong>
-              </span>
-                             <span className="rounded-full bg-rose-100 px-2 py-0.5 text-xs" style={{ color: '#2B578A' }}>
-                room: <strong>{room}</strong>
-              </span>
+          <header className="p-4">
+            <div className="flex justify-center">
+              <h1 className="text-xl" style={{ color: '#2B578A' }}>HONDAカメラ</h1>
             </div>
 
-            <div className="mt-3 flex items-center gap-2">
+            <div className="mt-3 flex justify-center">
               <button
                 type="button"
                 onClick={() => setRecActive((v) => !v)}
                 disabled={!joinedRole}
-                                 className={
-                   "rounded-full px-4 py-2 text-white transition " +
-                   (recActive ? "hover:opacity-80" : "hover:opacity-80")
-                 }
-                 style={{
-                   backgroundColor: recActive ? '#2B578A' : '#2B578A'
-                 }}
+                className={
+                  "rounded-full px-8 py-4 text-lg font-semibold text-white transition " +
+                  (recActive ? "hover:opacity-80" : "hover:opacity-80")
+                }
+                style={{
+                  backgroundColor: recActive ? '#2B578A' : '#2B578A'
+                }}
                 aria-pressed={recActive}
                 title={recActive ? "録音停止" : "録音開始"}
               >
-                                 {recActive ? "■ 録音停止" : "▶ HONDAカメラ始動"}
+                {recActive ? "■ 録音停止" : "▶ HONDAカメラ始動"}
               </button>
-                             <p className="text-sm" style={{ color: '#2B578A' }}>{status}</p>
-                             <span className="ml-auto text-xs" style={{ color: '#2B578A' }}>
-                WS: {["CONNECTING", "OPEN", "CLOSING", "CLOSED"][readyState] ?? readyState}
-              </span>
             </div>
-
-                         {rosterText && <div className="mt-2 text-xs" style={{ color: '#2B578A' }}>{rosterText}</div>}
           </header>
+
+          {/* 情報表示（カメラカードの上に表示） */}
+          <div className="text-[10px] text-right" style={{ color: '#2B578A' }}>
+            <div>ID:{me?.account_id} Room:{room} {rosterText && rosterText}</div>
+          </div>
 
           {/* 上：カメラ */}
           <section aria-label="カメラ" className="rounded-2xl bg-white p-2 shadow-sm ring-1 ring-rose-100">
-            <CameraPreview apiBase={API_BASE} wsRef={wsRef} myDeviceId={myDeviceId} sendJson={sendJson} />
-          </section>
-
-          {/* 中：文字起こし（← ここを“カメラとプレビューの間”に配置） */}
-          <section aria-label="文字起こし" className="rounded-2xl bg-white/80 p-3 shadow-sm ring-1 ring-rose-100">
-                         <h2 className="text-sm" style={{ color: '#2B578A' }}>文字起こし（リアルタイム）</h2>
-                         <div className="mt-2 min-h-[44px] rounded-lg bg-rose-50 px-3 py-2" style={{ color: '#2B578A' }}>
-                             {liveText ? liveText : <span style={{ color: '#2B578A' }}>（発話待機中）</span>}
-            </div>
-            <div className="mt-3 max-h-60 overflow-y-auto rounded-lg bg-white ring-1 ring-rose-100">
-              {finalLines.length === 0 ? (
-                                 <div className="p-3 text-sm" style={{ color: '#2B578A' }}>（確定テキストはまだありません）</div>
-              ) : (
-                <ul className="divide-y divide-rose-100">
-                  {finalLines.map((l, i) => (
-                                         <li key={l.ts + ":" + i} className="p-3 text-sm" style={{ color: '#2B578A' }}>
-                      {new Date(l.ts).toLocaleTimeString()}：{l.text}
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
+            <CameraPreview apiBase={API_BASE} wsRef={wsRef} myDeviceId={myDeviceId} sendJson={sendJson}>
+              {/* 文字起こし部分（カメラカード内、手動で撮影ボタンの上に表示） */}
+              <div className="rounded-2xl bg-white/80 p-3 shadow-sm ring-1 ring-rose-100">
+                <h2 className="text-sm" style={{ color: '#2B578A' }}>文字起こし（リアルタイム）</h2>
+                <div className="mt-2 min-h-[44px] rounded-lg bg-rose-50 px-3 py-2" style={{ color: '#2B578A' }}>
+                  {liveText ? liveText : <span style={{ color: '#2B578A' }}>（発話待機中）</span>}
+                </div>
+                <div className="mt-3 max-h-60 overflow-y-auto rounded-lg bg-white ring-1 ring-rose-100">
+                  {finalLines.length === 0 ? (
+                    <div className="p-3 text-sm" style={{ color: '#2B578A' }}>（確定テキストはまだありません）</div>
+                  ) : (
+                    <ul className="divide-y divide-rose-100">
+                      {finalLines.map((l, i) => (
+                        <li key={l.ts + ":" + i} className="p-3 text-sm" style={{ color: '#2B578A' }}>
+                          {new Date(l.ts).toLocaleTimeString()}：{l.text}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              </div>
+            </CameraPreview>
           </section>
 
           {/* キーワードで撮影した通知（任意） */}
