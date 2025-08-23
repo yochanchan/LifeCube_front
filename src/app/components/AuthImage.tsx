@@ -1,4 +1,4 @@
-// src/components/AuthImage.tsx
+// src/app/components/AuthImage.tsx
 "use client";
 
 import React, { useEffect, useState } from "react";

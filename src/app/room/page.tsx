@@ -206,10 +206,10 @@ export default function RoomSelectPage() {
                 </div>
               </Link>
 
-              {/* トップへ戻るボタン */}
-              <Link href="/" className="block">
+              {/* ログイン画面へ戻るボタン */}
+              <Link href="/login" className="block">
                 <button className="w-full rounded-xl bg-white px-4 py-2 ring-1 ring-rose-200 hover:bg-rose-50" style={{ color: '#2B578A' }}>
-                  トップへ戻る
+                  再ログインする
                 </button>
               </Link>
             </div>

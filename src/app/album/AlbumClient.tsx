@@ -4,24 +4,11 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import useSWR, { useSWRConfig } from "swr";
-import Link from "next/link";
-
-// 新しく作成したファイルをインポート
-import { Quiz, useQuiz } from "./quiz";
+import { Quiz } from "./quiz";
 import { SlideShow } from "./slideshow";
-import { DateChips, PicturesGrid, endpoints, formatDate } from "./UI";
+import { DateChips, PicturesGrid, endpoints } from "./UI";
 import { ImageModal } from "./ImageModal";
-
-/* ───────────────────────────────────────────────────────────
-   定数・ユーティリティ
-   ─────────────────────────────────────────────────────────── */
-
-/** SWR 用フェッチャ（毎回取得: no-store） */
-const fetcher = <T,>(url: string) =>
-  fetch(url, { cache: "no-store", credentials: "include" }).then((res) => {
-    if (!res.ok) throw new Error(`Request failed: ${res.status} ${res.statusText}`);
-    return res.json() as Promise<T>;
-  });
+import { apiclient } from "@/lib/apiclient";
 
 /* ───────────────────────────────────────────────────────────
    型
@@ -42,8 +29,13 @@ export type PictureMeta = {
   image_size: number;
   sha256_hex: string | null;
   created_at: string;
-  thumbnail_path?: string;
+  thumbnail_path?: string; // 例: /api/pictures/{id}/thumbnail?w=256 （パスのみ）
 };
+
+/* ───────────────────────────────────────────────────────────
+   SWR fetcher（JWT対応：apiclient経由）
+   ─────────────────────────────────────────────────────────── */
+const fetcher = <T,>(path: string) => apiclient.getJSON<T>(path);
 
 /* ───────────────────────────────────────────────────────────
    メインコンポーネント
@@ -59,11 +51,9 @@ export default function AlbumClient({
   };
 }) {
   const router = useRouter();
-
-  // SWR設定を取得（トップレベルで呼び出し）
   const { mutate } = useSWRConfig();
 
-  // 認証チェック：未ログインなら /login へ（Hooks は常にトップレベルで宣言）
+  // 認証チェック（JWT：apiclient経由）
   const [me, setMe] = useState<{ account_id: number; email: string; role: string } | null>(null);
   const [authChecked, setAuthChecked] = useState(false);
 
@@ -71,12 +61,7 @@ export default function AlbumClient({
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch(`${process.env.NEXT_PUBLIC_API_ENDPOINT || "http://localhost:8000"}/auth/me`, {
-          credentials: "include",
-          cache: "no-store",
-        });
-        if (!res.ok) throw new Error("unauth");
-        const j = await res.json();
+        const j = await apiclient.getJSON<{ account_id: number; email: string; role: string }>("/auth/me");
         if (!cancelled) setMe(j);
       } catch {
         if (!cancelled) router.replace(`/login?next=/album`);
@@ -112,8 +97,7 @@ export default function AlbumClient({
   }, [dates, selectedDate]);
 
   /** 写真一覧（選択日付が決まっており、かつ認証OKのときのみ） */
-  const picsKey =
-    authReady && selectedDate ? endpoints.byDate(selectedDate, tripId, 256) : null;
+  const picsKey = authReady && selectedDate ? endpoints.byDate(selectedDate, tripId, 256) : null;
   const {
     data: pictures = initial.pictures,
     error: errorPics,
@@ -123,13 +107,13 @@ export default function AlbumClient({
   // スライドショー関連の状態
   const [currentIndex, setCurrentIndex] = useState(0);
   const [autoPlayInterval, setAutoPlayInterval] = useState<NodeJS.Timeout | null>(null);
-  const [isPlaying, setIsPlaying] = useState(true); // 自動再生の状態
+  const [isPlaying, setIsPlaying] = useState(true);
 
   // スライドショー用のランダム日付と写真
   const [slideshowDate, setSlideshowDate] = useState<string | null>(null);
   const [slideshowPictures, setSlideshowPictures] = useState<PictureMeta[]>([]);
 
-  // スライドショーを復元するための状態
+  // スライドショー復元用
   const [previousSlideshowDate, setPreviousSlideshowDate] = useState<string | null>(null);
   const [previousSlideshowPictures, setPreviousSlideshowPictures] = useState<PictureMeta[]>([]);
 
@@ -141,7 +125,7 @@ export default function AlbumClient({
     }
   }, [dates]);
 
-  // 選択された日付の写真を取得
+  // 選択された日付の写真（スライドショー用）
   const slideshowPicsKey = authReady && slideshowDate ? endpoints.byDate(slideshowDate, tripId, 800) : null;
   const { data: allSlideshowPictures = [] } = useSWR<PictureMeta[]>(slideshowPicsKey, fetcher, { fallbackData: [] });
 
@@ -158,7 +142,7 @@ export default function AlbumClient({
     if (isPlaying && slideshowPictures.length > 0) {
       const interval = setInterval(() => {
         setCurrentIndex((prev) => (prev + 1) % slideshowPictures.length);
-      }, 3000); // 3秒間隔
+      }, 3000);
       setAutoPlayInterval(interval);
       return () => clearInterval(interval);
     } else if (autoPlayInterval) {
@@ -167,21 +151,17 @@ export default function AlbumClient({
     }
   }, [isPlaying, slideshowPictures.length]);
 
-  // コンポーネントのアンマウント時にクリーンアップ
+  // アンマウント時にクリーンアップ
   useEffect(() => {
     return () => {
-      if (autoPlayInterval) {
-        clearInterval(autoPlayInterval);
-      }
+      if (autoPlayInterval) clearInterval(autoPlayInterval);
     };
   }, [autoPlayInterval]);
 
   // スライドショーコントロール
-  const togglePlayPause = useCallback(() => {
-    setIsPlaying(!isPlaying);
-  }, [isPlaying]);
+  const togglePlayPause = useCallback(() => setIsPlaying((v) => !v), []);
 
-  // スライドショーを復元する関数
+  // スライドショー復元
   const restoreSlideshow = useCallback(() => {
     if (previousSlideshowDate && previousSlideshowPictures.length > 0) {
       setSlideshowDate(previousSlideshowDate);
@@ -199,64 +179,36 @@ export default function AlbumClient({
   const [userAnswer, setUserAnswer] = useState<string>("");
   const [quizResult, setQuizResult] = useState<"correct" | "incorrect" | null>(null);
 
-  // クイズを自動生成して開始
   const startQuiz = useCallback(() => {
     if (slideshowPictures.length > 0 && currentIndex < slideshowPictures.length) {
       const currentPicture = slideshowPictures[currentIndex];
 
-      // 写真の情報からクイズを自動生成
       let question = "";
       let answer = "";
       let choices: string[] = [];
 
       if (currentPicture.user_comment) {
-        // ユーザーコメントがある場合
         question = `この写真のコメントは何ですか？`;
         answer = currentPicture.user_comment;
-        choices = [
-          answer,
-          "素晴らしい景色ですね",
-          "楽しい時間でした",
-          "思い出に残る一枚です"
-        ];
+        choices = [answer, "素晴らしい景色ですね", "楽しい時間でした", "思い出に残る一枚です"];
       } else if (currentPicture.situation_for_quiz) {
-        // 状況説明がある場合
         question = `この写真が撮影された状況は何ですか？`;
         answer = currentPicture.situation_for_quiz;
-        choices = [
-          answer,
-          "家族旅行中",
-          "友達との食事",
-          "仕事の合間"
-        ];
+        choices = [answer, "家族旅行中", "友達との食事", "仕事の合間"];
       } else if (currentPicture.device_id) {
-        // デバイスIDがある場合
         question = `この写真は何というデバイスで撮影されましたか？`;
         answer = currentPicture.device_id;
-        choices = [
-          answer,
-          "スマートフォン",
-          "デジタルカメラ",
-          "タブレット"
-        ];
+        choices = [answer, "スマートフォン", "デジタルカメラ", "タブレット"];
       } else {
-        // 日時からクイズを生成
         const date = new Date(currentPicture.pictured_at);
         const hours = date.getHours();
-        let timeOfDay = "";
-        if (hours >= 5 && hours < 12) timeOfDay = "朝";
-        else if (hours >= 12 && hours < 17) timeOfDay = "昼";
-        else if (hours >= 17 && hours < 21) timeOfDay = "夕方";
-        else timeOfDay = "夜";
-
+        const timeOfDay = hours >= 5 && hours < 12 ? "朝" : hours < 17 ? "昼" : hours < 21 ? "夕方" : "夜";
         question = `この写真は何時頃に撮影されましたか？`;
         answer = timeOfDay;
         choices = ["朝", "昼", "夕方", "夜"];
       }
 
-      // 選択肢をシャッフル
       const shuffledChoices = [...choices].sort(() => Math.random() - 0.5);
-
       setQuizQuestion(question);
       setQuizAnswer(answer);
       setQuizChoices(shuffledChoices);
@@ -266,18 +218,15 @@ export default function AlbumClient({
     }
   }, [slideshowPictures, currentIndex]);
 
-  // クイズを回答
   const submitQuiz = useCallback(() => {
     if (!userAnswer) {
       alert("選択肢を選んでください。");
       return;
     }
-
     const isCorrect = userAnswer === quizAnswer;
     setQuizResult(isCorrect ? "correct" : "incorrect");
   }, [userAnswer, quizAnswer]);
 
-  // クイズを閉じる
   const closeQuiz = useCallback(() => {
     setShowQuiz(false);
     setQuizQuestion("");
@@ -287,71 +236,58 @@ export default function AlbumClient({
     setQuizResult(null);
   }, []);
 
-  // 画像モーダル関連の状態
+  // 画像モーダル
   const [selectedPicture, setSelectedPicture] = useState<PictureMeta | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  // 写真をクリックしたときの処理
   const handlePictureClick = useCallback((picture: PictureMeta) => {
     setSelectedPicture(picture);
     setIsModalOpen(true);
   }, []);
 
-  // モーダルを閉じる処理
   const handleCloseModal = useCallback(() => {
     setIsModalOpen(false);
     setSelectedPicture(null);
   }, []);
 
-  // 写真削除の処理
-  const handleDeletePictures = useCallback(async (pictureIds: number[]) => {
-    if (!picsKey) return;
+  // 写真削除（JWT対応）
+  const handleDeletePictures = useCallback(
+    async (pictureIds: number[]) => {
+      if (!picsKey) return;
 
-    const confirmMessage = pictureIds.length === 1
-      ? "この写真を削除しますか？（元に戻せません）"
-      : `選択された${pictureIds.length}枚の写真を削除しますか？（元に戻せません）`;
+      const confirmMessage =
+        pictureIds.length === 1
+          ? "この写真を削除しますか？（元に戻せません）"
+          : `選択された${pictureIds.length}枚の写真を削除しますか？（元に戻せません）`;
 
-    if (!window.confirm(confirmMessage)) return;
+      if (!window.confirm(confirmMessage)) return;
 
-    try {
-      const deletePromises = pictureIds.map(async (id) => {
-        const res = await fetch(endpoints.deletePicture(id), {
-          method: "DELETE",
-          credentials: "include",
-        });
-        if (!res.ok && res.status !== 204) {
-          const text = await res.text().catch(() => "");
-          throw new Error(`写真ID ${id} の削除に失敗: ${res.status} ${res.statusText} ${text}`);
+      try {
+        await Promise.all(pictureIds.map((id) => apiclient.del(endpoints.deletePicture(id))));
+        // SWRキャッシュを更新
+        await mutate(
+          picsKey,
+          (prev: PictureMeta[] | undefined) => prev?.filter((x) => !pictureIds.includes(x.picture_id)),
+          { revalidate: false }
+        );
+        // スライドショーの写真も更新
+        if (slideshowPictures.length > 0) {
+          setSlideshowPictures((prev) => prev.filter((p) => !pictureIds.includes(p.picture_id)));
         }
-        return id;
-      });
-
-      await Promise.all(deletePromises);
-
-      // SWRキャッシュを更新
-      await mutate(
-        picsKey,
-        (prev: PictureMeta[] | undefined) => prev?.filter((x) => !pictureIds.includes(x.picture_id)),
-        { revalidate: false }
-      );
-
-      // スライドショーの写真も更新
-      if (slideshowPictures.length > 0) {
-        setSlideshowPictures(prev => prev.filter(p => !pictureIds.includes(p.picture_id)));
+        alert(`${pictureIds.length}枚の写真を削除しました。`);
+      } catch (error) {
+        console.error("Delete error:", error);
+        alert(`削除中にエラーが発生しました: ${error instanceof Error ? error.message : String(error)}`);
       }
-
-      alert(`${pictureIds.length}枚の写真を削除しました。`);
-    } catch (error) {
-      console.error('Delete error:', error);
-      alert(`削除中にエラーが発生しました: ${error instanceof Error ? error.message : String(error)}`);
-    }
-  }, [picsKey, slideshowPictures.length, mutate]);
+    },
+    [picsKey, slideshowPictures.length, mutate]
+  );
 
   return (
-    <main className="min-h-screen" style={{ backgroundColor: '#BDD9D7' }}>
+    <main className="min-h-screen" style={{ backgroundColor: "#BDD9D7" }}>
       {!authReady ? (
         <div className="min-h-[40vh] grid place-items-center">
-          <div className="rounded-xl bg-white/80 p-4 ring-1 ring-blue-100" style={{ color: '#2B578A' }}>
+          <div className="rounded-xl bg-white/80 p-4 ring-1 ring-blue-100" style={{ color: "#2B578A" }}>
             認証確認中…
           </div>
         </div>
@@ -359,15 +295,17 @@ export default function AlbumClient({
         <div className="mx-auto max-w-6xl px-4 py-8">
           {/* ヘッダー */}
           <header className="text-center mb-8">
-            <h1 className="text-4xl mb-4" style={{ color: '#2B578A' }}>アルバム</h1>
+            <h1 className="text-4xl mb-4" style={{ color: "#2B578A" }}>
+              アルバム
+            </h1>
 
-            {/* スライドショーに戻るボタン（スライドショーが閉じられている場合のみ表示） */}
+            {/* スライドショーに戻るボタン */}
             {!slideshowPictures.length && previousSlideshowDate && previousSlideshowPictures.length > 0 && (
               <div className="mt-4">
                 <button
                   onClick={restoreSlideshow}
                   className="text-white px-6 py-2 rounded-full font-medium transition-colors hover:opacity-80"
-                  style={{ backgroundColor: '#2B578A' }}
+                  style={{ backgroundColor: "#2B578A" }}
                   aria-label="スライドショーに戻る"
                 >
                   過去の思い出に戻る
@@ -388,10 +326,8 @@ export default function AlbumClient({
                 togglePlayPause={togglePlayPause}
                 onStartQuiz={startQuiz}
                 onGoToAlbum={() => {
-                  // スライドショーの状態を保存してから閉じる
                   setPreviousSlideshowDate(slideshowDate);
                   setPreviousSlideshowPictures([...slideshowPictures]);
-                  // スライドショーで表示されている日付のアルバムを表示
                   setSelectedDate(slideshowDate);
                   setSlideshowPictures([]);
                   setSlideshowDate(null);
@@ -399,7 +335,6 @@ export default function AlbumClient({
                   setCurrentIndex(0);
                 }}
               >
-                {/* クイズコンポーネントを子要素として渡す */}
                 <Quiz
                   showQuiz={showQuiz}
                   quizQuestion={quizQuestion}
@@ -417,7 +352,9 @@ export default function AlbumClient({
 
           {/* 日付セレクタ */}
           <section className="mb-8">
-            <h2 className="text-lg mb-4" style={{ color: '#2B578A' }}>アルバム日付</h2>
+            <h2 className="text-lg mb-4" style={{ color: "#2B578A" }}>
+              アルバム日付
+            </h2>
             <DateChips
               dates={dates ?? []}
               loading={!!loadingDates}
@@ -427,7 +364,7 @@ export default function AlbumClient({
             />
           </section>
 
-          {/* 写真グリッド（削除ボタン付き） */}
+          {/* 写真グリッド */}
           <section className="mb-8">
             <h2 className="sr-only">写真一覧</h2>
             <PicturesGrid
@@ -443,13 +380,7 @@ export default function AlbumClient({
       )}
 
       {/* 画像モーダル */}
-      <ImageModal
-        picture={selectedPicture}
-        isOpen={isModalOpen}
-        onClose={handleCloseModal}
-      />
+      <ImageModal picture={selectedPicture} isOpen={isModalOpen} onClose={handleCloseModal} />
     </main>
   );
 }
-
-
