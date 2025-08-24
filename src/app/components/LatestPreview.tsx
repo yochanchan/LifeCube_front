@@ -222,9 +222,9 @@ export default function LatestPreview({
   }, [preview]);
 
   return (
-    <section className="rounded-2xl bg-white p-2 shadow-sm ring-1 ring-rose-100">
+    <section className="rounded-2xl bg-white p-2 shadow-sm">
       {!objUrl ? (
-        <div className="mt-2 rounded-lg bg-rose-50 p-3 text-rose-400">（まだ写真がありません）</div>
+        <div className="mt-2 min-h-[44px] rounded-lg px-3 py-2 text-left" style={{ backgroundColor: "#EEFAF9", color: "#2B578A" }}>（まだ写真がありません）</div>
       ) : (
         <figure className="mt-2 overflow-hidden rounded-xl bg-white ring-1 ring-rose-100">
           {/* 直接API URLを刺さないこと！Authorizationが付かず403になる */}
@@ -236,7 +236,7 @@ export default function LatestPreview({
             decoding="async"
           />
           <figcaption className="flex items-center justify-between px-3 py-2 text-xs text-rose-700">
-            <span className="truncate">{caption}</span>
+            <span className="truncate"></span>
             {loading && <span className="rounded bg-rose-50 px-2 py-0.5">読み込み中…</span>}
           </figcaption>
         </figure>

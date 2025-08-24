@@ -110,31 +110,33 @@ export function SlideShow({
     `/api/pictures/${currentPicture.picture_id}/thumbnail?w=800`;
 
   return (
-    <div className="bg-white rounded-2xl shadow-lg p-6 max-w-4xl mx-auto relative overflow-hidden">
+    <div className="bg-white rounded-2xl shadow-lg p-6 max-w-4xl mx-auto relative overflow-hidden font-zen-maru-gothic">
       <style dangerouslySetInnerHTML={{ __html: heartAnimationStyle }} />
 
-      {/* 背景のハートアニメーション（元のまま） */}
+      {/* 背景のハートアニメーション（heart.png使用） */}
       <div className="absolute inset-0 pointer-events-none">
         {Array.from({ length: 20 }).map((_, i) => {
           const animationClass = i % 3 === 0 ? "animate-float" : i % 3 === 1 ? "animate-float2" : "animate-float3";
           const baseDelay = (i % 3) * 0.5;
           const randomDelay = Math.random() * 2;
           const totalDelay = baseDelay + randomDelay;
+          const size = 20 + Math.random() * 30; // 20px〜50pxのランダムサイズ
 
           return (
-            <div
+            <img
               key={i}
-              className={`absolute text-pink-300 opacity-60 ${animationClass}`}
+              src="/heart.png"
+              alt=""
+              className={`absolute opacity-60 ${animationClass}`}
               style={{
                 left: `${Math.random() * 100}%`,
                 top: `${Math.random() * 100}%`,
                 animationDelay: `${totalDelay}s`,
-                fontSize: `${14 + Math.random() * 20}px`,
+                width: `${size}px`,
+                height: `${size}px`,
                 filter: `hue-rotate(${Math.random() * 60}deg)`,
               }}
-            >
-              ❤
-            </div>
+            />
           );
         })}
       </div>
@@ -168,10 +170,10 @@ export function SlideShow({
       </div>
 
       {/* コントロール */}
-      <div className="mt-6 flex justify-center gap-4 relative z-10">
+      <div className="mt-6 flex justify-center gap-2 sm:gap-4 relative z-10 flex-wrap">
         <button
           onClick={togglePlayPause}
-          className="text-white px-6 py-2 rounded-full font-medium transition-colors"
+          className="text-white px-3 sm:px-6 py-2 rounded-full font-medium transition-colors text-sm sm:text-base whitespace-nowrap"
           style={{ backgroundColor: "#2B578A" }}
           aria-label={isPlaying ? "スライドショーを停止" : "スライドショーを再生"}
         >
@@ -179,7 +181,7 @@ export function SlideShow({
         </button>
         <button
           onClick={onStartQuiz}
-          className="text-white px-6 py-2 rounded-full font-medium transition-colors"
+          className="text-white px-3 sm:px-6 py-2 rounded-full font-medium transition-colors text-sm sm:text-base whitespace-nowrap"
           style={{ backgroundColor: "#2B578A" }}
           aria-label="クイズを開始"
         >
@@ -187,7 +189,7 @@ export function SlideShow({
         </button>
         <button
           onClick={onGoToAlbum}
-          className="text-white px-6 py-2 rounded-full font-medium transition-colors"
+          className="text-white px-3 sm:px-6 py-2 rounded-full font-medium transition-colors text-sm sm:text-base whitespace-nowrap"
           style={{ backgroundColor: "#2B578A" }}
           aria-label="この日のアルバム"
         >

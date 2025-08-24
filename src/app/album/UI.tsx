@@ -15,6 +15,8 @@ export type PictureMeta = {
   speech: string | null;
   situation_for_quiz: string | null;
   user_comment: string | null;
+  location_name: string | null; // 場所情報
+  audio_comment: string | null; // 音声コメント
   content_type: string;
   image_size: number;
   sha256_hex: string | null;
@@ -67,6 +69,7 @@ export const endpoints = {
   image: (id: number) => `/api/pictures/${id}/image`,
   thumb: (id: number, w: number = DEFAULT_THUMB_W) => `/api/pictures/${id}/thumbnail?w=${w}`,
   deletePicture: (id: number) => `/api/pictures/${id}`,
+  updatePicture: (id: number) => `/api/pictures/${id}`,
 };
 
 /* ───────────────────────────────────────────────────────────
@@ -115,7 +118,7 @@ export function DateChips({
     selectedYear && selectedMonth ? groupedDates[selectedYear][selectedMonth].sort((a, b) => Number(a) - Number(b)) : [];
 
   return (
-    <div className="mt-3 space-y-3">
+    <div className="mt-3 space-y-3 font-zen-maru-gothic">
       {/* 年選択 */}
       <div className="flex gap-2 overflow-x-auto pb-2">
         {years.map((year) => (
@@ -244,17 +247,20 @@ export function PicturesGrid({
   };
 
   return (
-    <div>
+    <div className="font-zen-maru-gothic">
       {/* 選択モードコントロール */}
       <div className="mb-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <button
-            onClick={toggleSelectMode}
-            className={`px-4 py-2 rounded-lg font-medium transition-colors ${isSelectMode ? "bg-blue-600 text-white" : "bg-white text-blue-700 ring-1 ring-blue-200 hover:bg-blue-50"
-              }`}
-          >
-            {isSelectMode ? "選択モード終了" : "写真を選択"}
-          </button>
+                     <button
+             onClick={toggleSelectMode}
+             className={`px-4 py-2 rounded-lg font-medium transition-colors ${isSelectMode ? "bg-blue-600 text-white" : "bg-white ring-1 ring-blue-200 hover:bg-blue-50"
+               }`}
+             style={{
+               color: isSelectMode ? "#FFFFFF" : "#2B578A",
+             }}
+           >
+             {isSelectMode ? "選択モード終了" : "写真を選択"}
+           </button>
 
           {isSelectMode && (
             <>
@@ -313,7 +319,7 @@ function PictureItem({
   const thumbPath = picture.thumbnail_path ?? endpoints.thumb(picture.picture_id, DEFAULT_THUMB_W);
 
   return (
-    <figure className="group relative overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-blue-100 aspect-square cursor-pointer">
+    <figure className="group relative overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-blue-100 aspect-square cursor-pointer font-zen-maru-gothic">
       <div onClick={() => onPictureClick(picture)} className="block h-full">
         <AuthImage
           path={thumbPath}
@@ -356,7 +362,7 @@ function PictureItem({
 
 function SkeletonChips() {
   return (
-    <div className="mt-3 flex gap-2 overflow-x-auto pb-2">
+    <div className="mt-3 flex gap-2 overflow-x-auto pb-2 font-zen-maru-gothic">
       {Array.from({ length: 6 }).map((_, i) => (
         <div key={i} className="h-9 w-28 animate-pulse rounded-full bg-blue-100/70" />
       ))}
@@ -366,7 +372,7 @@ function SkeletonChips() {
 
 function SkeletonGrid() {
   return (
-    <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
+    <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 font-zen-maru-gothic">
       {Array.from({ length: 8 }).map((_, i) => (
         <div key={i} className="aspect-square animate-pulse rounded-2xl bg-blue-100/70" />
       ))}
@@ -375,12 +381,12 @@ function SkeletonGrid() {
 }
 
 function ErrorBanner({ text }: { text: string }) {
-  return <div className="mt-3 rounded-xl bg-blue-100 p-3 text-blue-800">{text}</div>;
+  return <div className="mt-3 rounded-xl bg-blue-100 p-3 text-blue-800 font-zen-maru-gothic">{text}</div>;
 }
 
 function EmptyBanner({ text }: { text: string }) {
   return (
-    <div className="mt-3 rounded-xl bg-white p-3 text-blue-700 ring-1 ring-blue-100">
+    <div className="mt-3 rounded-xl bg-white p-3 text-blue-700 ring-1 ring-blue-100 font-zen-maru-gothic">
       {text}
     </div>
   );

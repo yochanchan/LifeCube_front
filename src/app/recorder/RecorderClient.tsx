@@ -160,6 +160,19 @@ export default function RecorderClient() {
     [broadcastTakePhoto]
   );
 
+  const handleLogout = useCallback(async () => {
+    try {
+      // ローカルストレージのJWTトークンを削除
+      localStorage.removeItem('jwt_token');
+      // ログインページにリダイレクト
+      router.replace('/login');
+    } catch (error) {
+      console.error('ログアウトエラー:', error);
+      // エラーが発生してもログインページにリダイレクト
+      router.replace('/login');
+    }
+  }, [router]);
+
   // タイマー類のクリーンアップ
   useEffect(() => {
     return () => {
@@ -184,7 +197,7 @@ export default function RecorderClient() {
           <header className="p-4">
             <div className="flex justify-center">
               <h1 className="text-xl" style={{ color: "#2B578A" }}>
-                HONDAカメラ
+                車内操作
               </h1>
             </div>
 
@@ -221,10 +234,10 @@ export default function RecorderClient() {
                 <h2 className="text-sm" style={{ color: "#2B578A" }}>
                   文字起こし（リアルタイム）
                 </h2>
-                <div className="mt-2 min-h-[44px] rounded-lg bg-rose-50 px-3 py-2" style={{ color: "#2B578A" }}>
+                <div className="mt-2 min-h-[44px] rounded-lg px-3 py-2" style={{ backgroundColor: "#EEFAF9", color: "#2B578A" }}>
                   {liveText ? liveText : <span style={{ color: "#2B578A" }}>（発話待機中）</span>}
                 </div>
-                <div className="mt-3 max-h-60 overflow-y-auto rounded-lg bg-white ring-1 ring-rose-100">
+                <div className="mt-3 max-h-60 overflow-y-auto rounded-lg ring-1" style={{ backgroundColor: "#EEFAF9" }}>
                   {finalLines.length === 0 ? (
                     <div className="p-3 text-sm" style={{ color: "#2B578A" }}>
                       （確定テキストはまだありません）
@@ -263,15 +276,6 @@ export default function RecorderClient() {
               debounceMs={1200}
               wsReady={readyState}
             />
-            <div className="mt-3 text-center">
-              <button
-                type="button"
-                className="rounded-full px-6 py-2 text-white hover:opacity-80 transition-opacity"
-                style={{ backgroundColor: "#2B578A" }}
-              >
-                編集
-              </button>
-            </div>
           </section>
 
           {/* 録音エンジン（UIなし） */}
@@ -287,7 +291,7 @@ export default function RecorderClient() {
 
           {/* ナビゲーションボタン */}
           <section className="mt-6">
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-4 gap-3">
               {/* 車外カメラボタン */}
               <button
                 onClick={() => router.push("/shooter")}
@@ -305,22 +309,22 @@ export default function RecorderClient() {
                 </div>
               </button>
 
-              {/* アルバムボタン */}
-              <button
-                onClick={() => router.push("/album")}
-                className="w-full rounded-xl bg-white p-3 hover:shadow-lg transition-shadow cursor-pointer ring-1 ring-blue-200"
-              >
-                <div className="flex flex-col items-center justify-center gap-2">
-                  <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: "#FCF98B" }}>
-                    <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                    </svg>
-                  </div>
-                  <span className="text-xs" style={{ color: "#2B578A" }}>
-                    アルバム
-                  </span>
-                </div>
-              </button>
+                             {/* アルバムボタン */}
+               <button
+                 onClick={() => router.push("/album")}
+                 className="w-full rounded-xl bg-white p-3 hover:shadow-lg transition-shadow cursor-pointer ring-1 ring-blue-200"
+               >
+                 <div className="flex flex-col items-center justify-center gap-2">
+                   <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: "#FCF98B" }}>
+                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ color: "#B6A98B" }}>
+                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                     </svg>
+                   </div>
+                   <span className="text-xs" style={{ color: "#2B578A" }}>
+                     アルバム
+                   </span>
+                 </div>
+               </button>
 
               {/* 戻るボタン */}
               <button
@@ -334,8 +338,23 @@ export default function RecorderClient() {
                     </svg>
                   </div>
                   <span className="text-xs" style={{ color: "#2B578A" }}>
-                    戻る
+                    トップに戻る
                   </span>
+                </div>
+              </button>
+
+              {/* ログアウトボタン */}
+              <button
+                onClick={handleLogout}
+                className="w-full rounded-xl bg-white p-3 hover:shadow-lg transition-shadow cursor-pointer ring-1 ring-blue-200"
+              >
+                <div className="flex flex-col items-center justify-center gap-2">
+                  <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: '#7B818B' }}>
+                    <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                    </svg>
+                  </div>
+                  <span className="text-xs" style={{ color: '#2B578A' }}>ログアウト</span>
                 </div>
               </button>
             </div>

@@ -6,31 +6,9 @@ import { useSearchParams, useRouter } from "next/navigation";
 import useSWR, { useSWRConfig } from "swr";
 import { Quiz } from "./quiz";
 import { SlideShow } from "./slideshow";
-import { DateChips, PicturesGrid, endpoints } from "./UI";
+import { DateChips, PicturesGrid, endpoints, PictureMeta } from "./UI";
 import { ImageModal } from "./ImageModal";
 import { apiclient } from "@/lib/apiclient";
-
-/* ───────────────────────────────────────────────────────────
-   型
-   ─────────────────────────────────────────────────────────── */
-
-export type PictureMeta = {
-  picture_id: number;
-  account_id: number;
-  trip_id: number | null;
-  pictured_at: string;
-  gps_lat: number | null;
-  gps_lng: number | null;
-  device_id: string | null;
-  speech: string | null;
-  situation_for_quiz: string | null;
-  user_comment: string | null;
-  content_type: string;
-  image_size: number;
-  sha256_hex: string | null;
-  created_at: string;
-  thumbnail_path?: string; // 例: /api/pictures/{id}/thumbnail?w=256 （パスのみ）
-};
 
 /* ───────────────────────────────────────────────────────────
    SWR fetcher（JWT対応：apiclient経由）
@@ -179,42 +157,147 @@ export default function AlbumClient({
   const [userAnswer, setUserAnswer] = useState<string>("");
   const [quizResult, setQuizResult] = useState<"correct" | "incorrect" | null>(null);
 
-  const startQuiz = useCallback(() => {
+  const startQuiz = useCallback(async () => {
     if (slideshowPictures.length > 0 && currentIndex < slideshowPictures.length) {
       const currentPicture = slideshowPictures[currentIndex];
-
-      let question = "";
-      let answer = "";
-      let choices: string[] = [];
-
-      if (currentPicture.user_comment) {
-        question = `この写真のコメントは何ですか？`;
-        answer = currentPicture.user_comment;
-        choices = [answer, "素晴らしい景色ですね", "楽しい時間でした", "思い出に残る一枚です"];
-      } else if (currentPicture.situation_for_quiz) {
-        question = `この写真が撮影された状況は何ですか？`;
-        answer = currentPicture.situation_for_quiz;
-        choices = [answer, "家族旅行中", "友達との食事", "仕事の合間"];
-      } else if (currentPicture.device_id) {
-        question = `この写真は何というデバイスで撮影されましたか？`;
-        answer = currentPicture.device_id;
-        choices = [answer, "スマートフォン", "デジタルカメラ", "タブレット"];
-      } else {
-        const date = new Date(currentPicture.pictured_at);
-        const hours = date.getHours();
-        const timeOfDay = hours >= 5 && hours < 12 ? "朝" : hours < 17 ? "昼" : hours < 21 ? "夕方" : "夜";
-        question = `この写真は何時頃に撮影されましたか？`;
-        answer = timeOfDay;
-        choices = ["朝", "昼", "夕方", "夜"];
+      
+      // 現在の写真から場所とコメントの情報を取得（ローカルストレージからも取得）
+      const key = `picture_${currentPicture.picture_id}`;
+      const savedData = localStorage.getItem(key);
+      let locationName = currentPicture.location_name;
+      let userComment = currentPicture.user_comment;
+      
+      if (savedData) {
+        try {
+          const savedPicture = JSON.parse(savedData);
+          locationName = savedPicture.location_name || currentPicture.location_name;
+          userComment = savedPicture.user_comment || currentPicture.user_comment;
+        } catch (error) {
+          console.error('Failed to parse saved data:', error);
+        }
       }
-
-      const shuffledChoices = [...choices].sort(() => Math.random() - 0.5);
+      
+      // 現在の写真に場所の情報がない場合は、同じ日の全写真から場所の情報を探す
+      if (!locationName) {
+        // 同じ日の全写真から場所の情報を探す（スライドショーに表示されていない写真も含む）
+        let allSameDayPictures: PictureMeta[] = [];
+        
+        // スライドショーに表示されている写真から場所の情報を探す
+        const slideshowPicturesWithLocation = slideshowPictures.filter(picture => {
+          if (picture.picture_id === currentPicture.picture_id) return false; // 現在の写真は除外
+          
+          // ローカルストレージからも情報を取得
+          const pictureKey = `picture_${picture.picture_id}`;
+          const pictureSavedData = localStorage.getItem(pictureKey);
+          let pictureLocation = picture.location_name;
+          
+          if (pictureSavedData) {
+            try {
+              const savedPicture = JSON.parse(pictureSavedData);
+              pictureLocation = savedPicture.location_name || picture.location_name;
+            } catch (error) {
+              console.error('Failed to parse saved data:', error);
+            }
+          }
+          
+          return pictureLocation; // 場所の情報のみを返す
+        });
+        
+        allSameDayPictures.push(...slideshowPicturesWithLocation);
+        
+        // 同じ日の全写真から場所の情報を探す（APIから取得）
+        if (slideshowDate && authReady) {
+          try {
+            // 同じ日の全写真を取得
+            const allPicturesKey = endpoints.byDate(slideshowDate, tripId, 800);
+            const allPictures = await apiclient.getJSON<PictureMeta[]>(allPicturesKey);
+            
+            if (allPictures && allPictures.length > 0) {
+              // スライドショーに表示されていない写真から場所の情報を探す
+              const additionalPictures = allPictures.filter(picture => {
+                // スライドショーに表示されている写真は除外
+                const isInSlideshow = slideshowPictures.some(slideshowPic => 
+                  slideshowPic.picture_id === picture.picture_id
+                );
+                if (isInSlideshow) return false;
+                
+                // ローカルストレージからも情報を取得
+                const pictureKey = `picture_${picture.picture_id}`;
+                const pictureSavedData = localStorage.getItem(pictureKey);
+                let pictureLocation = picture.location_name;
+                
+                if (pictureSavedData) {
+                  try {
+                    const savedPicture = JSON.parse(pictureSavedData);
+                    pictureLocation = savedPicture.location_name || picture.location_name;
+                  } catch (error) {
+                    console.error('Failed to parse saved data:', error);
+                  }
+                }
+                
+                return pictureLocation; // 場所の情報のみを返す
+              });
+              
+              allSameDayPictures.push(...additionalPictures);
+            }
+          } catch (error) {
+            console.error('Failed to fetch all pictures for the same date:', error);
+          }
+        }
+        
+        if (allSameDayPictures.length > 0) {
+          // ランダムで1枚選択
+          const randomPicture = allSameDayPictures[Math.floor(Math.random() * allSameDayPictures.length)];
+          const randomKey = `picture_${randomPicture.picture_id}`;
+          const randomSavedData = localStorage.getItem(randomKey);
+          
+          if (randomSavedData) {
+            try {
+              const savedRandomPicture = JSON.parse(randomSavedData);
+              locationName = savedRandomPicture.location_name || randomPicture.location_name;
+            } catch (error) {
+              console.error('Failed to parse saved data:', error);
+            }
+      } else {
+            locationName = randomPicture.location_name;
+          }
+        }
+      }
+      
+            // 場所の情報がある場合のみクイズを生成
+      if (locationName) {
+        const question = `どこに行ったでしょう？`;
+        const answer = locationName;
+        
+        // 場所に関する選択肢を生成（地名のみ）
+        const locationChoices = [
+          "東京", "大阪", "京都", "名古屋", "横浜", "神戸", "札幌", "仙台", "福岡", "広島",
+          "奈良", "鎌倉", "箱根", "富士山", "沖縄", "北海道", "九州", "四国", "東北", "関西",
+          "伊豆", "熱海", "軽井沢", "白浜", "由布院", "草津", "有馬", "登別", "下呂", "別府"
+        ];
+        
+        // 正解の場所が選択肢に含まれていない場合は追加
+        if (!locationChoices.includes(answer)) {
+          locationChoices.push(answer);
+        }
+        
+        // 4つの選択肢をランダムで選択
+        const choices = [answer];
+        const otherChoices = locationChoices.filter(choice => choice !== answer);
+        const shuffledOthers = otherChoices.sort(() => Math.random() - 0.5);
+        choices.push(...shuffledOthers.slice(0, 3));
+        
+        const shuffledChoices = [...choices].sort(() => Math.random() - 0.5);
       setQuizQuestion(question);
       setQuizAnswer(answer);
       setQuizChoices(shuffledChoices);
       setUserAnswer("");
       setQuizResult(null);
       setShowQuiz(true);
+      } else {
+        // 場所の情報が記入されていない場合のメッセージ
+        alert("この日の写真には場所の情報が不足しています。\n写真を編集して場所を追加してからクイズを開始してください。");
+      }
     }
   }, [slideshowPictures, currentIndex]);
 
@@ -283,8 +366,21 @@ export default function AlbumClient({
     [picsKey, slideshowPictures.length, mutate]
   );
 
+  const handleLogout = useCallback(async () => {
+    try {
+      // ローカルストレージのJWTトークンを削除
+      localStorage.removeItem('jwt_token');
+      // ログインページにリダイレクト
+      router.replace('/login');
+    } catch (error) {
+      console.error('ログアウトエラー:', error);
+      // エラーが発生してもログインページにリダイレクト
+      router.replace('/login');
+    }
+  }, [router]);
+
   return (
-    <main className="min-h-screen" style={{ backgroundColor: "#BDD9D7" }}>
+    <main className="min-h-screen font-zen-maru-gothic" style={{ backgroundColor: "#BDD9D7" }}>
       {!authReady ? (
         <div className="min-h-[40vh] grid place-items-center">
           <div className="rounded-xl bg-white/80 p-4 ring-1 ring-blue-100" style={{ color: "#2B578A" }}>
@@ -336,16 +432,16 @@ export default function AlbumClient({
                 }}
               >
                 <Quiz
-                  showQuiz={showQuiz}
-                  quizQuestion={quizQuestion}
-                  quizAnswer={quizAnswer}
-                  quizChoices={quizChoices}
-                  userAnswer={userAnswer}
-                  quizResult={quizResult}
-                  onUserAnswerChange={setUserAnswer}
-                  onSubmitQuiz={submitQuiz}
-                  onCloseQuiz={closeQuiz}
-                />
+                showQuiz={showQuiz}
+                quizQuestion={quizQuestion}
+                quizAnswer={quizAnswer}
+                quizChoices={quizChoices}
+                userAnswer={userAnswer}
+                quizResult={quizResult}
+                onUserAnswerChange={setUserAnswer}
+                onSubmitQuiz={submitQuiz}
+                onCloseQuiz={closeQuiz}
+              />
               </SlideShow>
             </section>
           )}
@@ -376,8 +472,78 @@ export default function AlbumClient({
               onDeletePictures={handleDeletePictures}
             />
           </section>
-        </div>
-      )}
+
+          {/* ナビゲーションボタン */}
+          <section className="mt-6">
+            <div className="grid grid-cols-4 gap-3">
+              {/* 車外カメラボタン */}
+        <button
+                onClick={() => router.push('/shooter')}
+                className="w-full rounded-xl bg-white p-3 hover:shadow-lg transition-shadow cursor-pointer ring-1 ring-blue-200"
+                aria-label="車外カメラページに移動"
+              >
+                <div className="flex flex-col items-center justify-center gap-2">
+                  <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: '#5BD3CB' }}>
+                    <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+      </div>
+                  <span className="text-xs" style={{ color: '#2B578A' }}>車外カメラ</span>
+          </div>
+                </button>
+
+              {/* 車内操作ボタン */}
+              <button
+                onClick={() => router.push('/recorder')}
+                className="w-full rounded-xl bg-white p-3 hover:shadow-lg transition-shadow cursor-pointer ring-1 ring-blue-200"
+                aria-label="車内操作ページに移動"
+              >
+                <div className="flex flex-col items-center justify-center gap-2">
+                  <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: '#B6A98B' }}>
+                    <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+            </div>
+                  <span className="text-xs" style={{ color: '#2B578A' }}>車内操作</span>
+            </div>
+              </button>
+
+              {/* トップに戻るボタン */}
+              <button
+                onClick={() => router.push('/room')}
+                className="w-full rounded-xl bg-white p-3 hover:shadow-lg transition-shadow cursor-pointer ring-1 ring-blue-200"
+                aria-label="トップページに戻る"
+              >
+                <div className="flex flex-col items-center justify-center gap-2">
+                  <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: '#2B578A' }}>
+                    <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                    </svg>
+                  </div>
+                  <span className="text-xs" style={{ color: '#2B578A' }}>トップに戻る</span>
+                </div>
+              </button>
+
+              {/* ログアウトボタン */}
+              <button
+                onClick={handleLogout}
+                className="w-full rounded-xl bg-white p-3 hover:shadow-lg transition-shadow cursor-pointer ring-1 ring-blue-200"
+                aria-label="ログアウト"
+              >
+                <div className="flex flex-col items-center justify-center gap-2">
+                  <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: '#7B818B' }}>
+                    <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                    </svg>
+                  </div>
+                  <span className="text-xs" style={{ color: '#2B578A' }}>ログアウト</span>
+                </div>
+              </button>
+            </div>
+          </section>
+              </div>
+            )}
 
       {/* 画像モーダル */}
       <ImageModal picture={selectedPicture} isOpen={isModalOpen} onClose={handleCloseModal} />

@@ -113,6 +113,19 @@ export default function ShooterClient() {
     window.dispatchEvent(new Event("app:take_photo"));
   }, []);
 
+  const handleLogout = useCallback(async () => {
+    try {
+      // ローカルストレージのJWTトークンを削除
+      localStorage.removeItem('jwt_token');
+      // ログインページにリダイレクト
+      router.replace('/login');
+    } catch (error) {
+      console.error('ログアウトエラー:', error);
+      // エラーが発生してもログインページにリダイレクト
+      router.replace('/login');
+    }
+  }, [router]);
+
   return (
     <main className="min-h-screen" style={{ backgroundColor: '#BDD9D7' }}>
       {!authReady ? (
@@ -121,66 +134,41 @@ export default function ShooterClient() {
         </div>
       ) : (
         <div className="mx-auto max-w-md p-4 space-y-4 sm:max-w-lg">
-          <header className="rounded-2xl bg-white/70 p-4 shadow-sm ring-1 ring-emerald-100">
-            <div className="flex flex-wrap items-center gap-2">
-              <h1 className="text-xl text-emerald-800">Shooter</h1>
-              <span className="ml-auto rounded-full bg-emerald-100 px-2 py-0.5 text-xs text-emerald-700">
-                account_id: <strong>{me?.account_id}</strong>
-              </span>
-              <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs text-emerald-700">
-                room: <strong>{room}</strong>
-              </span>
+          <header className="p-4">
+            <div className="flex justify-center">
+              <h1 className="text-xl" style={{ color: '#2B578A' }}>
+                車外カメラ
+              </h1>
             </div>
 
-            <div className="mt-3 flex items-center gap-2">
-              <button
-                type="button"
-                onClick={manualSnap}
-                className="rounded-full px-4 py-2 text-white hover:opacity-80 transition-opacity"
-                style={{ backgroundColor: '#2B578A' }}
-              >
-                手動で撮影
-              </button>
-              <span className="ml-auto text-xs text-emerald-600">
-                WS: {["CONNECTING", "OPEN", "CLOSING", "CLOSED"][readyState] ?? readyState}
-              </span>
-            </div>
-
-            {/* roster ミニ表示（任意） */}
-            {roster && (
-              <div className="mt-2 text-xs text-emerald-700">
-                RECORDER {roster.counts.recorder}/1, SHOOTER {roster.counts.shooter}/4
-              </div>
-            )}
+            
           </header>
+
+          {/* 情報表示（ヘッダーの下に表示） */}
+          <div className="text-[10px] text-right" style={{ color: '#2B578A' }}>
+            <div>
+              ID:{me?.account_id} Room:{room} RECORDER {roster?.counts.recorder ?? 0}/1, SHOOTER {roster?.counts.shooter ?? 0}/4
+            </div>
+          </div>
 
           {/* 上：カメラ（WSの take_photo を受けて自動撮影。CameraPreview が対応済み） */}
           <section aria-label="カメラ" className="rounded-2xl bg-white p-2 shadow-sm ring-1 ring-emerald-100">
             <CameraPreview apiBase={API_BASE} wsRef={wsRef} myDeviceId={myDeviceId} />
           </section>
 
-          {/* 下：直近の写真プレビュー（SHOOTERポリシー：自分の写真のみ） */}
-          <LatestPreview
-            apiBase={API_BASE}
-            wsRef={wsRef}
-            myDeviceId={myDeviceId}
-            policy="shooter"
-            debounceMs={1200}
-            wsReady={readyState}
-          />
-          <div className="mt-3 text-center">
-            <button
-              type="button"
-              className="rounded-full px-6 py-2 text-white hover:opacity-80 transition-opacity"
-              style={{ backgroundColor: '#2B578A' }}
-            >
-              編集
-            </button>
-          </div>
+                     {/* 下：直近の写真プレビュー（SHOOTERポリシー：自分の写真のみ） */}
+           <LatestPreview
+             apiBase={API_BASE}
+             wsRef={wsRef}
+             myDeviceId={myDeviceId}
+             policy="shooter"
+             debounceMs={1200}
+             wsReady={readyState}
+           />
 
           {/* ナビゲーションボタン */}
           <section className="mt-6">
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-4 gap-3">
               {/* 車内操作ボタン */}
               <button
                 onClick={() => router.push('/recorder')}
@@ -204,7 +192,7 @@ export default function ShooterClient() {
               >
                 <div className="flex flex-col items-center justify-center gap-2">
                   <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: '#FCF98B' }}>
-                    <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ color: '#B6A98B' }}>
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
                     </svg>
                   </div>
@@ -223,7 +211,22 @@ export default function ShooterClient() {
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
                     </svg>
                   </div>
-                  <span className="text-xs" style={{ color: '#2B578A' }}>戻る</span>
+                  <span className="text-xs" style={{ color: '#2B578A' }}>トップに戻る</span>
+                </div>
+              </button>
+
+              {/* ログアウトボタン */}
+              <button
+                onClick={handleLogout}
+                className="w-full rounded-xl bg-white p-3 hover:shadow-lg transition-shadow cursor-pointer ring-1 ring-blue-200"
+              >
+                <div className="flex flex-col items-center justify-center gap-2">
+                  <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: '#7B818B' }}>
+                    <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                    </svg>
+                  </div>
+                  <span className="text-xs" style={{ color: '#2B578A' }}>ログアウト</span>
                 </div>
               </button>
             </div>
