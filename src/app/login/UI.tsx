@@ -29,18 +29,32 @@ export default function LoginUI({
   return (
     <main className="min-h-screen flex items-center justify-center p-4" style={{ backgroundColor: '#BDD9D7' }}>
       <div className="w-full max-w-md">
-        {/* ロゴとタイトル */}
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full mb-4" style={{ backgroundColor: '#FCF98B' }}>
-            {/* カメラアイコン */}
-            <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ color: '#2B578A' }}>
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
-            </svg>
-          </div>
-          <h1 className="text-2xl mb-2" style={{ color: '#2B578A' }}>HONDAカメラ</h1>
-          <p className="text-sm" style={{ color: '#2B578A' }}>思い出を記録する旅行写真アプリ</p>
-        </div>
+                 {/* ロゴとタイトル */}
+         <div className="text-center mb-8">
+                       <div className="flex items-center justify-center gap-4 mb-4">
+              <div className="inline-flex items-center justify-center w-16 h-16 rounded-full" style={{ backgroundColor: '#B6A98B' }}>
+                {/* カメラアイコン */}
+                <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ color: '#FFFFFF' }}>
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+              </div>
+              <div className="inline-flex items-center justify-center w-16 h-16 rounded-full" style={{ backgroundColor: '#5BD3CB' }}>
+                {/* 車外カメラアイコン */}
+                <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ color: '#FFFFFF' }}>
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+              </div>
+              <div className="inline-flex items-center justify-center w-16 h-16 rounded-full" style={{ backgroundColor: '#FCF98B' }}>
+                {/* アルバムアイコン */}
+                <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ color: '#B6A98B' }}>
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                </svg>
+              </div>
+            </div>
+           <h1 className="text-2xl mb-2" style={{ color: '#2B578A' }}>HONDAカメラ</h1>
+           <p className="text-sm" style={{ color: '#2B578A' }}>家族ともっと楽しく、もっと笑顔に</p>
+         </div>
 
         {/* ログインフォーム */}
         <div className="bg-white rounded-2xl shadow-lg p-6">

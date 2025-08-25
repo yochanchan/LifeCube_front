@@ -30,7 +30,7 @@ export function Quiz({
   if (!showQuiz) return null;
 
   return (
-    <div className="mt-6 p-4 bg-gray-50 rounded-xl">
+    <div className="mt-6 p-4 bg-gray-50 rounded-xl font-zen-maru-gothic">
       <div className="mb-4">
         <h4 className="text-lg font-medium mb-2" style={{ color: "#2B578A" }}>
           クイズ

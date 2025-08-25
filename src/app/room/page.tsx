@@ -137,45 +137,63 @@ export default function RoomSelectPage() {
   const handleCameraClick = () => setShowCameraOptions(true);
   const handleBackToMain = () => setShowCameraOptions(false);
 
+  const handleLogout = useCallback(async () => {
+    try {
+      // ローカルストレージのJWTトークンを削除
+      localStorage.removeItem('jwt_token');
+      // ログインページにリダイレクト
+      router.replace('/login');
+    } catch (error) {
+      console.error('ログアウトエラー:', error);
+      // エラーが発生してもログインページにリダイレクト
+      router.replace('/login');
+    }
+  }, [router]);
+
   return (
     <main className="min-h-screen p-4" style={{ backgroundColor: '#BDD9D7' }}>
-      {meStatus === "loading" || meStatus === "idle" ? (
-        <div className="mx-auto max-w-md rounded-xl bg-white/80 p-4 ring-1 ring-rose-100">
-          認証確認中…
-        </div>
-      ) : meStatus === "error" ? (
-        <div className="mx-auto max-w-md space-y-3 rounded-xl bg-white/90 p-4 ring-1 ring-rose-200">
-          <div className="font-semibold text-rose-800">通信エラー</div>
-          <div className="text-sm text-rose-700 break-all">{meError}</div>
-          <button
-            onClick={retryAuth}
-            className="w-full rounded-xl bg-rose-500 px-4 py-2 font-semibold text-white hover:bg-rose-600"
-          >
-            再試行
-          </button>
-        </div>
-      ) : meStatus === "unauth" ? (
-        <div className="mx-auto max-w-md space-y-3 rounded-xl bg-white/90 p-4 ring-1 ring-rose-200">
-          <div className="font-semibold text-rose-800">ログインが必要です</div>
-          <div className="text-sm text-rose-700">ログインページへ遷移します…</div>
-          <Link href="/login?next=/room" className="block">
-            <button className="w-full rounded-xl bg-rose-500 px-4 py-2 font-semibold text-white hover:bg-rose-600">
-              ログインへ
-            </button>
-          </Link>
-        </div>
-      ) : (
-        <div className="mx-auto max-w-md space-y-4">
-          <header className="rounded-2xl bg-white/70 p-4 shadow-sm ring-1 ring-rose-100">
-            <h1 className="text-xl text-rose-800">機能選択</h1>
-            <div className="mt-2 text-sm text-rose-700">
-              accid: <b>{me!.account_id}</b> / room: <b>acc:{me!.account_id}</b> / device: <b>{myDeviceId}</b>
+             {meStatus === "loading" || meStatus === "idle" ? (
+         <div className="mx-auto max-w-md rounded-xl bg-white/80 p-4 ring-1 ring-rose-100" style={{ color: '#2B578A' }}>
+           認証確認中…
+         </div>
+       ) : meStatus === "error" ? (
+         <div className="mx-auto max-w-md space-y-3 rounded-xl bg-white/90 p-4 ring-1 ring-rose-200" style={{ color: '#2B578A' }}>
+           <div className="font-semibold">通信エラー</div>
+           <div className="text-sm break-all">{meError}</div>
+           <button
+             onClick={retryAuth}
+             className="w-full rounded-xl bg-rose-500 px-4 py-2 font-semibold text-white hover:bg-rose-600"
+           >
+             再試行
+           </button>
+         </div>
+       ) : meStatus === "unauth" ? (
+         <div className="mx-auto max-w-md space-y-3 rounded-xl bg-white/90 p-4 ring-1 ring-rose-200" style={{ color: '#2B578A' }}>
+           <div className="font-semibold">ログインが必要です</div>
+           <div className="text-sm">ログインページへ遷移します…</div>
+           <Link href="/login?next=/room" className="block">
+             <button className="w-full rounded-xl bg-rose-500 px-4 py-2 font-semibold text-white hover:bg-rose-600">
+               ログインへ
+             </button>
+           </Link>
+         </div>
+       ) : (
+         <div className="mx-auto max-w-md space-y-4">
+                       <header className="p-4">
+              <div className="flex justify-center">
+                <h1 className="text-xl" style={{ color: '#2B578A' }}>
+                  機能選択
+                </h1>
+              </div>
+            </header>
+
+            {/* 情報表示（ヘッダーの下に表示） */}
+            <div className="text-[10px] text-right" style={{ color: '#2B578A' }}>
+              <div>
+                ID:{me!.account_id} Room:{room} RECORDER {roster?.counts.recorder ?? 0}/1, SHOOTER {roster?.counts.shooter ?? 0}/4
+                {rosterError && <span className="ml-2">(取得エラー: {rosterError})</span>}
+              </div>
             </div>
-            <div className="mt-2 text-sm text-rose-700">
-              現在参加者：RECORDER {roster?.counts.recorder ?? 0}/1, SHOOTER {roster?.counts.shooter ?? 0}/4
-              {rosterError && <span className="ml-2 text-rose-500">(取得エラー: {rosterError})</span>}
-            </div>
-          </header>
 
           {!showCameraOptions ? (
             // メインメニュー
@@ -191,27 +209,36 @@ export default function RoomSelectPage() {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
                   </svg>
                 </div>
-                <span className="text-blue-600 text-sm">撮る</span>
+                <span className="text-sm" style={{ color: '#2B578A' }}>撮る</span>
               </button>
 
               {/* アルバムボタン */}
               <Link href="/album" className="block">
                 <div className="w-full rounded-xl bg-white p-6 text-center hover:shadow-lg transition-shadow cursor-pointer ring-1 ring-blue-200">
-                  <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-3" style={{ backgroundColor: '#FCF98B' }}>
-                    <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                    </svg>
-                  </div>
-                  <span className="text-blue-600 text-sm">アルバム</span>
+                                     <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-3" style={{ backgroundColor: '#FCF98B' }}>
+                     <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ color: '#B6A98B' }}>
+                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                     </svg>
+                   </div>
+                                     <span className="text-sm" style={{ color: '#2B578A' }}>アルバム</span>
                 </div>
               </Link>
 
-              {/* ログイン画面へ戻るボタン */}
-              <Link href="/login" className="block">
-                <button className="w-full rounded-xl bg-white px-4 py-2 ring-1 ring-rose-200 hover:bg-rose-50" style={{ color: '#2B578A' }}>
-                  再ログインする
-                </button>
-              </Link>
+                             {/* ログイン画面へ戻るボタン */}
+               <Link href="/login" className="block">
+                 <button className="w-full rounded-xl bg-white px-4 py-2 hover:bg-rose-50 flex items-center justify-center" style={{ color: '#2B578A' }}>
+                   ← ログインページに戻る
+                 </button>
+               </Link>
+
+                                                                                                                       {/* ログアウトボタン */}
+                 <button
+                   onClick={handleLogout}
+                   className="w-full rounded-xl bg-white px-4 py-2 hover:bg-gray-50 ring-1 ring-blue-200"
+                   style={{ color: '#2B578A' }}
+                 >
+                   ログアウト
+                 </button>
             </div>
           ) : (
             // カメラオプションメニュー
@@ -224,7 +251,7 @@ export default function RoomSelectPage() {
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
                     </svg>
                   </div>
-                  <span className="text-blue-600 text-sm">車内操作</span>
+                                     <span className="text-sm" style={{ color: '#2B578A' }}>車内操作</span>
                 </div>
               </Link>
 
@@ -235,16 +262,17 @@ export default function RoomSelectPage() {
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                     </svg>
                   </div>
-                  <span className="text-blue-600 text-sm">車外カメラ</span>
+                                     <span className="text-sm" style={{ color: '#2B578A' }}>車外カメラ</span>
                 </div>
               </Link>
 
-              <button
-                onClick={handleBackToMain}
-                className="w-full rounded-xl bg-white px-4 py-2 ring-1 ring-blue-200 hover:bg-blue-50 text-blue-600"
-              >
-                ← 戻る
-              </button>
+                             <button
+                 onClick={handleBackToMain}
+                 className="w-full rounded-xl bg-white px-4 py-2 ring-1 ring-blue-200 hover:bg-blue-50"
+                 style={{ color: '#2B578A' }}
+               >
+                 ← 戻る
+               </button>
             </div>
           )}
         </div>

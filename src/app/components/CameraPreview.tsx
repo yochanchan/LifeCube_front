@@ -183,8 +183,9 @@ export default function CameraPreview({ apiBase, wsRef, myDeviceId, sendJson, ch
           disabled={busy}
           className={
             "rounded-full px-4 py-2 text-white transition " +
-            (busy ? "bg-rose-300" : "bg-rose-500 hover:bg-rose-600")
+            (busy ? "bg-rose-300" : "hover:opacity-80")
           }
+          style={{ backgroundColor: busy ? undefined : "#2B578A" }}
         >
           {busy ? "アップロード中…" : "手動で撮影"}
         </button>
