@@ -23,6 +23,13 @@ type MsgPhotoUploaded = {
   pictured_at?: string;
 };
 
+type MsgRosterUpdate = {
+  type: "roster_update";
+  recorder: string | null;
+  shooters: string[];
+  counts: { recorder: number; shooter: number };
+};
+
 type LatestPreviewProps = {
   apiBase: string;                    // 互換のため受け取るが、直挿しはしない
   /** RefObject でも MutableRefObject でもOKな構造的型 */
@@ -59,6 +66,7 @@ export default function LatestPreview({
   debounceMs = 1200,
   wsReady,
 }: LatestPreviewProps) {
+  // 端末ごとの最新候補を保持
   const latestMapRef = useRef<Map<string, PhotoItem>>(new Map());
   const [preview, setPreview] = useState<PhotoItem | null>(null);
 
@@ -68,6 +76,13 @@ export default function LatestPreview({
   const [loading, setLoading] = useState(false);
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // 🔹 roster 情報（SHOOTER を優先するために必要）
+  const shooterIdsRef = useRef<Set<string>>(new Set());
+  const recorderIdRef = useRef<string | null>(null);
+
+  // 🔹 first-seen の安定選択用（key = `${device_id}#${seq}` -> firstSeenEpochMs）
+  const firstSeenRef = useRef<Map<string, number>>(new Map());
 
   // Object URL クリーンアップ
   useEffect(() => {
@@ -88,20 +103,43 @@ export default function LatestPreview({
         setPreview(null);
         return;
       }
-      if (policy === "recorder") {
-        // 自分以外を優先。なければ全体の最大 seq
-        const others = values.filter((v) => v.device_id !== myDeviceId);
-        const pickFrom = (others.length > 0 ? others : values).sort((a, b) => b.seq - a.seq);
-        setPreview(pickFrom[0] ?? null);
-      } else {
-        // shooter: 自分の最大 seq（要件どおり）
-        const mine = values.filter((v) => v.device_id === myDeviceId).sort((a, b) => b.seq - a.seq);
+
+      if (policy === "shooter") {
+        // 既存そのまま：自分の最大 seq
+        const mine = values
+          .filter((v) => v.device_id === myDeviceId)
+          .sort((a, b) => b.seq - a.seq);
         setPreview(mine[0] ?? null);
+        return;
       }
+
+      // ▼ policy === "recorder" の新ルール
+      // 1) 全体で最大 seq
+      let maxSeq = -Infinity;
+      for (const v of values) if (v.seq > maxSeq) maxSeq = v.seq;
+      const ties = values.filter((v) => v.seq === maxSeq);
+
+      // 2) 同じ seq なら SHOOTER を優先
+      const shooters = ties.filter((v) => shooterIdsRef.current.has(v.device_id));
+      const pool = shooters.length > 0 ? shooters : ties;
+
+      // 3) （SHOOTER がいる ties のとき）最初に観測した 1 枚で固定
+      //    SHOOTER がいない ties の場合も、安定のため first-seen 最小を採用
+      let pick: PhotoItem | null = null;
+      let bestSeen = Number.POSITIVE_INFINITY;
+      for (const v of pool) {
+        const key = `${v.device_id}#${v.seq}`;
+        const seen = firstSeenRef.current.get(key) ?? Number.POSITIVE_INFINITY;
+        if (seen < bestSeen) {
+          bestSeen = seen;
+          pick = v;
+        }
+      }
+      setPreview(pick ?? null);
     }, debounceMs);
   };
 
-  // WS 受信
+  // WS 受信（photo_uploaded / roster_update）
   useEffect(() => {
     const ws = wsRef.current;
     if (!ws || ws.readyState !== WebSocket.OPEN) return;
@@ -109,14 +147,23 @@ export default function LatestPreview({
     const onMessage = (ev: MessageEvent) => {
       try {
         const raw = JSON.parse(ev.data);
-        if (raw?.type !== "photo_uploaded") return;
 
+        if (raw?.type === "roster_update") {
+          const m = raw as MsgRosterUpdate;
+          recorderIdRef.current = m.recorder ?? null;
+          shooterIdsRef.current = new Set(m.shooters ?? []);
+          // 役割の優先度が変わる可能性があるので再評価
+          flushPick();
+          return;
+        }
+
+        if (raw?.type !== "photo_uploaded") return;
         const m = raw as MsgPhotoUploaded;
+
         const seq = Number.isFinite(m.seq)
           ? (m.seq as number)
-          : (m.pictured_at ? Date.parse(m.pictured_at) : Date.now()); // ← 補完
+          : (m.pictured_at ? Date.parse(m.pictured_at) : Date.now()); // 補完
 
-        // 新旧フィールドを考慮しつつ、絶対URLは apiBase と同一オリジンのときのみパス化
         const image_path =
           normalizeToPath(m.image_path, apiBase) ??
           normalizeToPath(m.image_url, apiBase);
@@ -133,6 +180,11 @@ export default function LatestPreview({
         const prev = map.get(item.device_id);
         if (!prev || item.seq > prev.seq) {
           map.set(item.device_id, item);
+          // first-seen は (device_id, seq) 組の初回のみ記録
+          const key = `${item.device_id}#${item.seq}`;
+          if (!firstSeenRef.current.has(key)) {
+            firstSeenRef.current.set(key, Date.now());
+          }
         }
         flushPick();
       } catch {
@@ -171,6 +223,10 @@ export default function LatestPreview({
       const prev = map.get(item.device_id);
       if (!prev || item.seq > prev.seq) {
         map.set(item.device_id, item);
+        const key = `${item.device_id}#${item.seq}`;
+        if (!firstSeenRef.current.has(key)) {
+          firstSeenRef.current.set(key, Date.now());
+        }
       }
       flushPick();
     };
@@ -196,7 +252,6 @@ export default function LatestPreview({
         // Authorization 付きで取得（apiclient 側が Bearer を付与）
         const url = await apiclient.getObjectUrl(preview.image_path);
         if (cancelled) {
-          // 生成しちゃったURLは即破棄
           URL.revokeObjectURL(url);
           return;
         }
@@ -224,7 +279,12 @@ export default function LatestPreview({
   return (
     <section className="rounded-2xl bg-white p-2 shadow-sm">
       {!objUrl ? (
-        <div className="mt-2 min-h-[44px] rounded-lg px-3 py-2 text-left" style={{ backgroundColor: "#EEFAF9", color: "#2B578A" }}>（まだ写真がありません）</div>
+        <div
+          className="mt-2 min-h-[44px] rounded-lg px-3 py-2 text-left"
+          style={{ backgroundColor: "#EEFAF9", color: "#2B578A" }}
+        >
+          （まだ写真がありません）
+        </div>
       ) : (
         <figure className="mt-2 overflow-hidden rounded-xl bg-white ring-1 ring-rose-100">
           {/* 直接API URLを刺さないこと！Authorizationが付かず403になる */}
