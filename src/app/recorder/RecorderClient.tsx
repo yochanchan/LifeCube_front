@@ -145,7 +145,7 @@ export default function RecorderClient() {
   const handleTranscript = useCallback((p: { text: string; isFinal: boolean; ts: number }) => {
     if (p.isFinal) {
       setLiveText("");
-      setFinalLines((prev) => [...prev, { text: p.text, ts: p.ts }].slice(-20));
+      setFinalLines((prev) => [{ text: p.text, ts: p.ts }, ...prev].slice(0, 20));
     } else {
       setLiveText(p.text);
     }
@@ -346,7 +346,7 @@ export default function RecorderClient() {
                 </div>
               </button>
 
-                             {/* アルバムボタン */}
+               {/* アルバムボタン */}
                <button
                  onClick={() => router.push("/album")}
                  className="w-full rounded-xl bg-white p-3 hover:shadow-lg transition-shadow cursor-pointer ring-1 ring-blue-200"
