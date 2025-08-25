@@ -144,7 +144,7 @@ export default function RecorderClient() {
   const handleTranscript = useCallback((p: { text: string; isFinal: boolean; ts: number }) => {
     if (p.isFinal) {
       setLiveText("");
-      setFinalLines((prev) => [...prev, { text: p.text, ts: p.ts }].slice(-20));
+      setFinalLines((prev) => [{ text: p.text, ts: p.ts }, ...prev].slice(0, 20));
     } else {
       setLiveText(p.text);
     }
@@ -309,22 +309,22 @@ export default function RecorderClient() {
                 </div>
               </button>
 
-                             {/* アルバムボタン */}
-               <button
-                 onClick={() => router.push("/album")}
-                 className="w-full rounded-xl bg-white p-3 hover:shadow-lg transition-shadow cursor-pointer ring-1 ring-blue-200"
-               >
-                 <div className="flex flex-col items-center justify-center gap-2">
-                   <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: "#FCF98B" }}>
-                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ color: "#B6A98B" }}>
-                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                     </svg>
-                   </div>
-                   <span className="text-xs" style={{ color: "#2B578A" }}>
-                     アルバム
-                   </span>
-                 </div>
-               </button>
+              {/* アルバムボタン */}
+              <button
+                onClick={() => router.push("/album")}
+                className="w-full rounded-xl bg-white p-3 hover:shadow-lg transition-shadow cursor-pointer ring-1 ring-blue-200"
+              >
+                <div className="flex flex-col items-center justify-center gap-2">
+                  <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: "#FCF98B" }}>
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ color: "#B6A98B" }}>
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                    </svg>
+                  </div>
+                  <span className="text-xs" style={{ color: "#2B578A" }}>
+                    アルバム
+                  </span>
+                </div>
+              </button>
 
               {/* 戻るボタン */}
               <button
