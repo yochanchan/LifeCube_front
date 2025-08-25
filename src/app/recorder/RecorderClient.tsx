@@ -346,7 +346,7 @@ export default function RecorderClient() {
                 </div>
               </button>
 
-              {/* アルバムボタン */}
+                             {/* アルバムボタン */}
                <button
                  onClick={() => router.push("/album")}
                  className="w-full rounded-xl bg-white p-3 hover:shadow-lg transition-shadow cursor-pointer ring-1 ring-blue-200"
