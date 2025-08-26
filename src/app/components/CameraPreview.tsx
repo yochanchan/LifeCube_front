@@ -111,15 +111,27 @@ export default function CameraPreview({ apiBase, wsRef, myDeviceId, sendJson, ch
         // ✅ Authorization 自動付与（Bearer）
         const j = await apiclient.postForm<UploadResp>("/api/pictures", fd);
 
-        // image_path が無い場合もフォールバックで組み立て
-        const imagePath = j.image_path ?? `/api/pictures/${j.picture_id}/image`;
+        // ✅ プレビュー用の画像パスを決定
+        //    - まずはサーバが返した image_path を優先
+        //    - 無ければ thumbnail_path をフォールバック（PoCでは十分）
+        //    - 最後の保険として /image 形式（現状 404 になる環境では到達しない想定）
+        const imagePath =
+          j.image_path
+          ?? j.thumbnail_path
+          ?? `/api/pictures/${j.picture_id}/image`;
+
+        // ✅ 最新選定用の seq（同時撮影時の安定化のため、外部から貰えればそれを優先）
+        const seq = typeof seqOverride === "number" ? seqOverride : Date.now();
+
         const payload = {
           type: "photo_uploaded",
           picture_id: j.picture_id,
           device_id: myDeviceId,
-          image_url: imagePath, // LatestPreview は image_url を読む
+          // LatestPreview は image_path → image_url の順に参照するため、両方に入れて互換性を担保
+          image_path: imagePath,
+          image_url: imagePath,
           pictured_at: j.pictured_at ?? new Date().toISOString(),
-          seq: typeof seqOverride === "number" ? seqOverride : Date.now(), // ★ 同期された ts を優先
+          seq,
         };
 
         // ✅ 即時ローカル通知（WS往復を待たずプレビュー反映）
@@ -142,8 +154,9 @@ export default function CameraPreview({ apiBase, wsRef, myDeviceId, sendJson, ch
   // ローカルイベント → 撮影（detail.ts を受け取って seq に採用）
   useEffect(() => {
     const onLocal = (ev: Event) => {
+      // CustomEvent で detail.ts を受ける想定（通常の Event の場合は undefined）
       const ce = ev as CustomEvent<{ ts?: number }>;
-      void snapAndUpload(ce.detail?.ts);
+      void snapAndUpload(ce?.detail?.ts);
     };
     window.addEventListener("app:take_photo", onLocal as EventListener);
     return () => {
