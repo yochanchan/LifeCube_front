@@ -1,4 +1,3 @@
-// src/app/recorder/RecorderClient.tsx
 "use client";
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -101,7 +100,9 @@ export default function RecorderClient() {
     pingIntervalMs: 5000,
     onMessage: (msg: WsMessage) => {
       if (msg?.type === "take_photo" && (msg as any).origin_device_id !== myDeviceId) {
-        window.dispatchEvent(new Event("app:take_photo"));
+        // 受け取った ts を同タブ内に流す（CameraPreview が拾って seq に採用）
+        const ts = (msg as any).ts;
+        window.dispatchEvent(new CustomEvent("app:take_photo", { detail: { ts } }));
       }
       // photo_uploaded の最新選定は LatestPreview 側で処理
     },
@@ -134,16 +135,18 @@ export default function RecorderClient() {
 
   // “撮影要求のブロードキャスト”
   const broadcastTakePhoto = useCallback(() => {
-    // 自分も撮影
-    window.dispatchEvent(new Event("app:take_photo"));
-    // 他端末へ通知
-    sendJson({ type: "take_photo", origin_device_id: myDeviceId, ts: Date.now() });
+    const ts = Date.now();
+    // 自分も撮影（ts を detail に乗せる）
+    window.dispatchEvent(new CustomEvent("app:take_photo", { detail: { ts } }));
+    // 他端末へ通知（ts を共有）
+    sendJson({ type: "take_photo", origin_device_id: myDeviceId, ts });
   }, [sendJson, myDeviceId]);
 
   // 文字起こしハンドラ
   const handleTranscript = useCallback((p: { text: string; isFinal: boolean; ts: number }) => {
     if (p.isFinal) {
       setLiveText("");
+      // 最新を上に表示
       setFinalLines((prev) => [{ text: p.text, ts: p.ts }, ...prev].slice(0, 20));
     } else {
       setLiveText(p.text);
@@ -298,7 +301,7 @@ export default function RecorderClient() {
                 className="w-full rounded-xl bg-white p-3 hover:shadow-lg transition-shadow cursor-pointer ring-1 ring-blue-200"
               >
                 <div className="flex flex-col items-center justify-center gap-2">
-                  <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: "#5BD3CB" }}>
+                  <div className="w-8 h-8 rounded-full flex items-center justify中心" style={{ backgroundColor: "#5BD3CB" }}>
                     <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                     </svg>
@@ -312,10 +315,10 @@ export default function RecorderClient() {
               {/* アルバムボタン */}
               <button
                 onClick={() => router.push("/album")}
-                className="w-full rounded-xl bg-white p-3 hover:shadow-lg transition-shadow cursor-pointer ring-1 ring-blue-200"
+                className="w-full rounded-xl bg白 p-3 hover:shadow-lg transition-shadow cursor-pointer ring-1 ring-blue-200"
               >
-                <div className="flex flex-col items-center justify-center gap-2">
-                  <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: "#FCF98B" }}>
+                <div className="flex flex-col items-center justify中心 gap-2">
+                  <div className="w-8 h-8 rounded-full flex items-center justify中心" style={{ backgroundColor: "#FCF98B" }}>
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ color: "#B6A98B" }}>
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
                     </svg>
@@ -329,11 +332,11 @@ export default function RecorderClient() {
               {/* 戻るボタン */}
               <button
                 onClick={() => router.push("/room")}
-                className="w-full rounded-xl bg-white p-3 hover:shadow-lg transition-shadow cursor-pointer ring-1 ring-blue-200"
+                className="w-full rounded-xl bg白 p-3 hover:shadow-lg transition-shadow cursor-pointer ring-1 ring-blue-200"
               >
-                <div className="flex flex-col items-center justify-center gap-2">
-                  <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: "#2B578A" }}>
-                    <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <div className="flex flex-col items-center justify中心 gap-2">
+                  <div className="w-8 h-8 rounded-full flex items-center justify中心" style={{ backgroundColor: "#2B578A" }}>
+                    <svg className="w-4 h-4 text白" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
                     </svg>
                   </div>
@@ -346,11 +349,11 @@ export default function RecorderClient() {
               {/* ログアウトボタン */}
               <button
                 onClick={handleLogout}
-                className="w-full rounded-xl bg-white p-3 hover:shadow-lg transition-shadow cursor-pointer ring-1 ring-blue-200"
+                className="w-full rounded-xl bg白 p-3 hover:shadow-lg transition-shadow cursor-pointer ring-1 ring-blue-200"
               >
-                <div className="flex flex-col items-center justify-center gap-2">
-                  <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: '#7B818B' }}>
-                    <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <div className="flex flex-col items-center justify中心 gap-2">
+                  <div className="w-8 h-8 rounded-full flex items-center justify中心" style={{ backgroundColor: '#7B818B' }}>
+                    <svg className="w-4 h-4 text白" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
                     </svg>
                   </div>

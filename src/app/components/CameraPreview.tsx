@@ -1,4 +1,3 @@
-// src/app/components/CameraPreview.tsx
 "use client";
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
@@ -78,76 +77,80 @@ export default function CameraPreview({ apiBase, wsRef, myDeviceId, sendJson, ch
     [sendJson, wsRef]
   );
 
-  // 撮影 & アップロード
-  const snapAndUpload = useCallback(async () => {
-    if (busy) return;
-    const video = videoRef.current;
-    const canvas = canvasRef.current;
-    if (!video || !canvas) return;
+  // 撮影 & アップロード（必要に応じて seq を外部から指定できる）
+  const snapAndUpload = useCallback(
+    async (seqOverride?: number) => {
+      if (busy) return;
+      const video = videoRef.current;
+      const canvas = canvasRef.current;
+      if (!video || !canvas) return;
 
-    try {
-      setBusy(true);
-      setMsg(null);
+      try {
+        setBusy(true);
+        setMsg(null);
 
-      const w = video.videoWidth || 1280;
-      const h = video.videoHeight || 720;
-      canvas.width = w;
-      canvas.height = h;
+        const w = video.videoWidth || 1280;
+        const h = video.videoHeight || 720;
+        canvas.width = w;
+        canvas.height = h;
 
-      const ctx = canvas.getContext("2d");
-      if (!ctx) throw new Error("canvas context 取得に失敗しました");
+        const ctx = canvas.getContext("2d");
+        if (!ctx) throw new Error("canvas context 取得に失敗しました");
 
-      ctx.drawImage(video, 0, 0, w, h);
+        ctx.drawImage(video, 0, 0, w, h);
 
-      const blob: Blob = await new Promise((resolve, reject) => {
-        canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("toBlob 失敗"))), "image/jpeg", 0.92);
-      });
+        const blob: Blob = await new Promise((resolve, reject) => {
+          canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("toBlob 失敗"))), "image/jpeg", 0.92);
+        });
 
-      const fd = new FormData();
-      fd.append("file", blob, `snap_${Date.now()}.jpg`);
-      fd.append("device_id", myDeviceId);
+        const fd = new FormData();
+        fd.append("file", blob, `snap_${Date.now()}.jpg`);
+        fd.append("device_id", myDeviceId);
 
-      // ✅ Authorization 自動付与（Bearer）
-      const j = await apiclient.postForm<UploadResp>("/api/pictures", fd);
+        // ✅ Authorization 自動付与（Bearer）
+        const j = await apiclient.postForm<UploadResp>("/api/pictures", fd);
 
-      // image_path が無い場合もフォールバックで組み立て
-      const imagePath = j.image_path ?? `/api/pictures/${j.picture_id}/image`;
-      const payload = {
-        type: "photo_uploaded",
-        picture_id: j.picture_id,
-        device_id: myDeviceId,
-        image_url: imagePath, // LatestPreview は image_url を読む
-        pictured_at: j.pictured_at ?? new Date().toISOString(),
-        seq: Date.now(),      // ✅ 最新選定用に必須
-      };
+        // image_path が無い場合もフォールバックで組み立て
+        const imagePath = j.image_path ?? `/api/pictures/${j.picture_id}/image`;
+        const payload = {
+          type: "photo_uploaded",
+          picture_id: j.picture_id,
+          device_id: myDeviceId,
+          image_url: imagePath, // LatestPreview は image_url を読む
+          pictured_at: j.pictured_at ?? new Date().toISOString(),
+          seq: typeof seqOverride === "number" ? seqOverride : Date.now(), // ★ 同期された ts を優先
+        };
 
-      // ✅ 即時ローカル通知（WS往復を待たずプレビュー反映）
-      window.dispatchEvent(new CustomEvent("photo_uploaded_local", { detail: payload }));
+        // ✅ 即時ローカル通知（WS往復を待たずプレビュー反映）
+        window.dispatchEvent(new CustomEvent("photo_uploaded_local", { detail: payload }));
 
-      // ✅ 共有のためWSにも送る（サーバ側からも同種が流れてくるなら二重でもOK）
-      sendWs(payload);
+        // ✅ 共有のためWSにも送る（サーバ側からも同種が流れてくるなら二重でもOK）
+        sendWs(payload);
 
-      setMsg("アップロードしました");
-      setTimeout(() => setMsg(null), 2000);
-    } catch (e: any) {
-      setMsg(e?.message ?? String(e));
-    } finally {
-      setBusy(false);
-    }
-  }, [busy, myDeviceId, sendWs]);
+        setMsg("アップロードしました");
+        setTimeout(() => setMsg(null), 2000);
+      } catch (e: any) {
+        setMsg(e?.message ?? String(e));
+      } finally {
+        setBusy(false);
+      }
+    },
+    [busy, myDeviceId, sendWs]
+  );
 
-  // ローカルイベント → 撮影
+  // ローカルイベント → 撮影（detail.ts を受け取って seq に採用）
   useEffect(() => {
-    const onLocal = () => {
-      void snapAndUpload();
+    const onLocal = (ev: Event) => {
+      const ce = ev as CustomEvent<{ ts?: number }>;
+      void snapAndUpload(ce.detail?.ts);
     };
-    window.addEventListener("app:take_photo", onLocal);
+    window.addEventListener("app:take_photo", onLocal as EventListener);
     return () => {
-      window.removeEventListener("app:take_photo", onLocal);
+      window.removeEventListener("app:take_photo", onLocal as EventListener);
     };
   }, [snapAndUpload]);
 
-  // WS受信 → 撮影（自端末は無視）
+  // WS受信 → 撮影（自端末は無視）。msg.ts を seq として採用
   useEffect(() => {
     const ws = wsRef.current;
     if (!ws) return;
@@ -156,7 +159,7 @@ export default function CameraPreview({ apiBase, wsRef, myDeviceId, sendJson, ch
       try {
         const msg = JSON.parse(ev.data);
         if (msg?.type === "take_photo" && msg.origin_device_id !== myDeviceId) {
-          void snapAndUpload();
+          void snapAndUpload(typeof msg.ts === "number" ? msg.ts : undefined);
         }
       } catch {
         /* noop */

@@ -1,4 +1,3 @@
-// src/app/components/LatestPreview.tsx
 "use client";
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
@@ -160,8 +159,10 @@ export default function LatestPreview({
         if (raw?.type !== "photo_uploaded") return;
         const m = raw as MsgPhotoUploaded;
 
-        const seq = Number.isFinite(m.seq)
-          ? (m.seq as number)
+        // ★ seq を確実に数値化して判定
+        const seqNum = Number(m.seq);
+        const seq = Number.isFinite(seqNum)
+          ? seqNum
           : (m.pictured_at ? Date.parse(m.pictured_at) : Date.now()); // 補完
 
         const image_path =
@@ -203,8 +204,10 @@ export default function LatestPreview({
       const m = ce.detail;
       if (!m) return;
 
-      const seq = Number.isFinite(m.seq as number)
-        ? (m.seq as number)
+      // ★ seq を確実に数値化して判定
+      const seqNum = Number(m.seq as number);
+      const seq = Number.isFinite(seqNum)
+        ? seqNum
         : (m.pictured_at ? Date.parse(m.pictured_at!) : Date.now());
 
       const image_path =
