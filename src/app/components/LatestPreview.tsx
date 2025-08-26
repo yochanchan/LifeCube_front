@@ -1,3 +1,4 @@
+// src/app/components/LatestPreview.tsx
 "use client";
 
 import React, { useEffect, useMemo, useRef, useState } from "react";

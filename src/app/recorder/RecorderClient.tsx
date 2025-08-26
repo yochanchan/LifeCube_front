@@ -61,6 +61,7 @@ export default function RecorderClient() {
   const [liveText, setLiveText] = useState<string>("");
   const [finalLines, setFinalLines] = useState<{ text: string; ts: number }[]>([]);
   const [triggerMsg, setTriggerMsg] = useState<string | null>(null);
+  const [lastKeyword, setLastKeyword] = useState<string | null>(null);
   const triggerTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const myDeviceId = useMemo(getOrCreateDeviceId, []);
@@ -156,9 +157,10 @@ export default function RecorderClient() {
   const handleTrigger = useCallback(
     (p: { keyword: string; source: "interim" | "final"; text: string; ts: number }) => {
       broadcastTakePhoto();
+      setLastKeyword(p.keyword);
       setTriggerMsg(`キーワード：「${p.keyword}」により撮影されました`);
       if (triggerTimerRef.current) clearTimeout(triggerTimerRef.current);
-      triggerTimerRef.current = setTimeout(() => setTriggerMsg(null), 4000);
+      triggerTimerRef.current = setTimeout(() => setTriggerMsg(null), 2000);
     },
     [broadcastTakePhoto]
   );
@@ -183,6 +185,23 @@ export default function RecorderClient() {
     };
   }, []);
 
+  // アップロードトーストの表示/非表示イベントに同期して、キーワードトーストも同時に閉じる
+  useEffect(() => {
+    const onUploadToastStarted = (e: Event) => {
+      const detail = (e as CustomEvent).detail as { duration?: number } | undefined;
+      const duration = detail?.duration ?? 2000;
+      if (triggerTimerRef.current) clearTimeout(triggerTimerRef.current);
+      triggerTimerRef.current = setTimeout(() => setTriggerMsg(null), duration);
+    };
+    const onUploadToastEnded = () => setTriggerMsg(null);
+    window.addEventListener("camera:upload_toast_started", onUploadToastStarted as EventListener);
+    window.addEventListener("camera:upload_toast_ended", onUploadToastEnded);
+    return () => {
+      window.removeEventListener("camera:upload_toast_started", onUploadToastStarted as EventListener);
+      window.removeEventListener("camera:upload_toast_ended", onUploadToastEnded);
+    };
+  }, []);
+
   const rosterText =
     roster && `RECORDER ${roster.counts.recorder}/1, SHOOTER ${roster.counts.shooter}/4`;
 
@@ -198,10 +217,20 @@ export default function RecorderClient() {
         <div className="mx-auto max-w-md p-4 space-y-4 sm:max-w-lg">
           {/* ヘッダ */}
           <header className="p-4">
-            <div className="flex justify-center">
+            <div className="flex justify-center items-center gap-2">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ color: '#2B578A' }}>
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 18.5a6.5 6.5 0 006.5-6.5v-4a6.5 6.5 0 00-13 0v4a6.5 6.5 0 006.5 6.5z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 18.5v3" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 22h8" />
+              </svg>
               <h1 className="text-xl" style={{ color: "#2B578A" }}>
-                車内操作
+                車内カメラ
               </h1>
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ color: '#2B578A' }}>
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 18.5a6.5 6.5 0 006.5-6.5v-4a6.5 6.5 0 00-13 0v4a6.5 6.5 0 006.5 6.5z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 18.5v3" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 22h8" />
+              </svg>
             </div>
 
             <div className="mt-3 flex justify-center">
@@ -268,9 +297,16 @@ export default function RecorderClient() {
 
           {/* 下：直近の写真プレビュー（RECORDERポリシー） */}
           <section aria-label="直近の写真プレビュー" className="rounded-2xl bg-white p-2 shadow-sm ring-1 ring-rose-100">
-            <h2 className="text-sm" style={{ color: "#2B578A" }}>
-              直近の写真プレビュー
-            </h2>
+            <div className="flex justify-between items-center mb-2">
+              <h2 className="text-sm" style={{ color: "#2B578A" }}>
+                直近の写真プレビュー
+              </h2>
+              {lastKeyword && (
+                <div className="text-xs" style={{ color: "#2B578A" }}>
+                  キーワード：「{lastKeyword}」
+                </div>
+              )}
+            </div>
             <LatestPreview
               apiBase={API_BASE}
               wsRef={wsRef}
@@ -301,12 +337,13 @@ export default function RecorderClient() {
                 className="w-full rounded-xl bg-white p-3 hover:shadow-lg transition-shadow cursor-pointer ring-1 ring-blue-200"
               >
                 <div className="flex flex-col items-center justify-center gap-2">
-                  <div className="w-8 h-8 rounded-full flex items-center justify中心" style={{ backgroundColor: "#5BD3CB" }}>
+                  <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: "#5BD3CB" }}>
                     <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
                     </svg>
                   </div>
-                  <span className="text-xs" style={{ color: "#2B578A" }}>
+                  <span className="text-[10px]" style={{ color: "#2B578A" }}>
                     車外カメラ
                   </span>
                 </div>
@@ -315,15 +352,15 @@ export default function RecorderClient() {
               {/* アルバムボタン */}
               <button
                 onClick={() => router.push("/album")}
-                className="w-full rounded-xl bg白 p-3 hover:shadow-lg transition-shadow cursor-pointer ring-1 ring-blue-200"
+                className="w-full rounded-xl bg-white p-3 hover:shadow-lg transition-shadow cursor-pointer ring-1 ring-blue-200"
               >
-                <div className="flex flex-col items-center justify中心 gap-2">
-                  <div className="w-8 h-8 rounded-full flex items-center justify中心" style={{ backgroundColor: "#FCF98B" }}>
+                <div className="flex flex-col items-center justify-center gap-2">
+                  <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: "#FCF98B" }}>
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ color: "#B6A98B" }}>
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
                     </svg>
                   </div>
-                  <span className="text-xs" style={{ color: "#2B578A" }}>
+                  <span className="text-[10px]" style={{ color: "#2B578A" }}>
                     アルバム
                   </span>
                 </div>
@@ -340,7 +377,7 @@ export default function RecorderClient() {
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
                     </svg>
                   </div>
-                  <span className="text-xs" style={{ color: "#2B578A" }}>
+                  <span className="text-[10px]" style={{ color: "#2B578A" }}>
                     トップに戻る
                   </span>
                 </div>
@@ -357,7 +394,7 @@ export default function RecorderClient() {
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
                     </svg>
                   </div>
-                  <span className="text-xs" style={{ color: '#2B578A' }}>ログアウト</span>
+                  <span className="text-[10px]" style={{ color: '#2B578A' }}>ログアウト</span>
                 </div>
               </button>
             </div>
