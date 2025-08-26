@@ -1,4 +1,3 @@
-// src/app/shooter/ShooterClient.tsx
 "use client";
 
 import React, { useEffect, useMemo, useState, useCallback } from "react";
@@ -72,8 +71,8 @@ export default function ShooterClient() {
     pingIntervalMs: 5000,
     onMessage: (msg) => {
       if (msg?.type === "take_photo" && (msg as any).origin_device_id !== myDeviceId) {
-        // 他端末からのトリガーだけ拾う
-        window.dispatchEvent(new Event("app:take_photo"));
+        // 他端末からのトリガーだけ拾う（ts を継承してローカルに流す）
+        window.dispatchEvent(new CustomEvent("app:take_photo", { detail: { ts: (msg as any).ts } }));
       }
     },
   });
@@ -109,8 +108,9 @@ export default function ShooterClient() {
   }, [authReady, room, readyState, joinedRole, join]);
 
   const manualSnap = useCallback(() => {
-    // 手動撮影（CameraPreview 内のイベントに委ねる）
-    window.dispatchEvent(new Event("app:take_photo"));
+    // 手動撮影（ts を付与してローカルに配信）
+    const ts = Date.now();
+    window.dispatchEvent(new CustomEvent("app:take_photo", { detail: { ts } }));
   }, []);
 
   const handleLogout = useCallback(async () => {
@@ -148,8 +148,6 @@ export default function ShooterClient() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
               </svg>
             </div>
-
-            
           </header>
 
           {/* 情報表示（ヘッダーの下に表示） */}
@@ -164,15 +162,15 @@ export default function ShooterClient() {
             <CameraPreview apiBase={API_BASE} wsRef={wsRef} myDeviceId={myDeviceId} />
           </section>
 
-                     {/* 下：直近の写真プレビュー（SHOOTERポリシー：自分の写真のみ） */}
-           <LatestPreview
-             apiBase={API_BASE}
-             wsRef={wsRef}
-             myDeviceId={myDeviceId}
-             policy="shooter"
-             debounceMs={1200}
-             wsReady={readyState}
-           />
+          {/* 下：直近の写真プレビュー（SHOOTERポリシー：自分の写真のみ） */}
+          <LatestPreview
+            apiBase={API_BASE}
+            wsRef={wsRef}
+            myDeviceId={myDeviceId}
+            policy="shooter"
+            debounceMs={1200}
+            wsReady={readyState}
+          />
 
           {/* ナビゲーションボタン */}
           <section className="mt-6">
