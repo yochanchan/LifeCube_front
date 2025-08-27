@@ -369,11 +369,11 @@ export default function RecorderClient() {
               {/* 戻るボタン */}
               <button
                 onClick={() => router.push("/room")}
-                className="w-full rounded-xl bg白 p-3 hover:shadow-lg transition-shadow cursor-pointer ring-1 ring-blue-200"
+                className="w-full rounded-xl bg-white p-3 hover:shadow-lg transition-shadow cursor-pointer ring-1 ring-blue-200"
               >
-                <div className="flex flex-col items-center justify中心 gap-2">
-                  <div className="w-8 h-8 rounded-full flex items-center justify中心" style={{ backgroundColor: "#2B578A" }}>
-                    <svg className="w-4 h-4 text白" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <div className="flex flex-col items-center justify-center gap-2">
+                  <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: "#2B578A" }}>
+                    <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
                     </svg>
                   </div>
@@ -386,11 +386,11 @@ export default function RecorderClient() {
               {/* ログアウトボタン */}
               <button
                 onClick={handleLogout}
-                className="w-full rounded-xl bg白 p-3 hover:shadow-lg transition-shadow cursor-pointer ring-1 ring-blue-200"
+                className="w-full rounded-xl bg-white p-3 hover:shadow-lg transition-shadow cursor-pointer ring-1 ring-blue-200"
               >
-                <div className="flex flex-col items-center justify中心 gap-2">
-                  <div className="w-8 h-8 rounded-full flex items-center justify中心" style={{ backgroundColor: '#7B818B' }}>
-                    <svg className="w-4 h-4 text白" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <div className="flex flex-col items-center justify-center gap-2">
+                  <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: '#7B818B' }}>
+                    <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
                     </svg>
                   </div>
